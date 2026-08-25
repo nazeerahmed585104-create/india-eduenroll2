@@ -1,6 +1,6 @@
 {
   "name": "EduPlatform - Institution & Partner Portal",
-  "description": "Multi-profile education platform with configurable business revenue models, listing tiers, partner commission settlements, and tele-sales counselor workspace.",
+  "description": "Multi-profile education platform with configurable business revenue models, listing tiers, Razorpay payment gateway, partner commission settlements, and tele-sales counselor workspace.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

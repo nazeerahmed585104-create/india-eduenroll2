@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Check, 
   Crown, 
@@ -12,9 +12,13 @@ import {
   PhoneCall, 
   BarChart3, 
   Award,
-  Layers
+  Layers,
+  CreditCard,
+  FileCheck
 } from 'lucide-react';
 import { InstitutionProfileData, ListingPlanTier } from '../types/education';
+import { RazorpayPaymentModal } from './RazorpayPaymentModal';
+import { RazorpayTransactionRecord } from '../types/razorpay';
 
 interface ListingPlanManagerProps {
   institution: InstitutionProfileData;
@@ -26,6 +30,41 @@ export const ListingPlanManager: React.FC<ListingPlanManagerProps> = ({
   onUpdatePlan
 }) => {
   const currentPlan: ListingPlanTier = institution.listingPlan || 'paid';
+  const [razorpayModalState, setRazorpayModalState] = useState<{
+    isOpen: boolean;
+    tier: ListingPlanTier;
+    amount: number;
+    title: string;
+  }>({
+    isOpen: false,
+    tier: 'paid',
+    amount: 14999,
+    title: 'Paid Listing Plan'
+  });
+  const [lastPaymentSuccess, setLastPaymentSuccess] = useState<RazorpayTransactionRecord | null>(null);
+
+  const handleSelectPlan = (tier: ListingPlanTier) => {
+    if (tier === 'free') {
+      onUpdatePlan('free');
+      return;
+    }
+
+    const amount = tier === 'featured' ? 34999 : 14999;
+    const title = tier === 'featured' ? 'Monthly Premium / Featured Listing Plan' : 'Monthly Paid Listing Plan';
+    
+    // Open Razorpay gateway modal
+    setRazorpayModalState({
+      isOpen: true,
+      tier,
+      amount,
+      title
+    });
+  };
+
+  const handlePaymentSuccess = (tx: RazorpayTransactionRecord) => {
+    setLastPaymentSuccess(tx);
+    onUpdatePlan(razorpayModalState.tier);
+  };
 
   const planCards = [
     {
@@ -63,7 +102,7 @@ export const ListingPlanManager: React.FC<ListingPlanManagerProps> = ({
       description: 'Enhanced visibility with priority search rankings, verified trust badge, and full lead CRM.',
       badge: 'Most Popular',
       badgeColor: 'bg-indigo-600/30 text-indigo-300 border-indigo-500/40',
-      buttonText: currentPlan === 'paid' ? 'Current Active Plan' : 'Select Paid Tier',
+      buttonText: currentPlan === 'paid' ? 'Current Active Plan' : 'Pay ₹14,999 via Razorpay',
       buttonClass: currentPlan === 'paid' ? 'bg-indigo-600/40 text-indigo-300 border border-indigo-500/40 cursor-default' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-950',
       popular: true,
       features: [
@@ -92,7 +131,7 @@ export const ListingPlanManager: React.FC<ListingPlanManagerProps> = ({
       description: 'Maximum exposure with top homepage placement, sponsored course tags, and dedicated tele-sales advisors.',
       badge: 'Highest ROI & Conversions',
       badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-      buttonText: currentPlan === 'featured' ? 'Current Active Plan' : 'Upgrade to Featured',
+      buttonText: currentPlan === 'featured' ? 'Current Active Plan' : 'Pay ₹34,999 via Razorpay',
       buttonClass: currentPlan === 'featured' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-default' : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-lg shadow-amber-950',
       featured: true,
       features: [
@@ -117,6 +156,27 @@ export const ListingPlanManager: React.FC<ListingPlanManagerProps> = ({
   return (
     <div className="space-y-6">
       
+      {/* Toast for recent payment */}
+      {lastPaymentSuccess && (
+        <div className="p-4 rounded-2xl bg-emerald-950/80 border border-emerald-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-200 shadow-xl animate-in fade-in">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+              ✓
+            </div>
+            <div>
+              <span className="font-bold text-white block">Razorpay Subscription Active &bull; {lastPaymentSuccess.invoiceNumber}</span>
+              <span className="text-slate-300 text-[11px]">Payment ID: {lastPaymentSuccess.paymentId} &bull; Total Paid: ₹{lastPaymentSuccess.amount.toLocaleString()} (incl. GST)</span>
+            </div>
+          </div>
+          <button 
+            onClick={() => setLastPaymentSuccess(null)}
+            className="px-3 py-1 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-white text-[11px] self-start sm:self-auto"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 space-y-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -125,13 +185,13 @@ export const ListingPlanManager: React.FC<ListingPlanManagerProps> = ({
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                 Partner Monetization Tiers
               </span>
-              <span className="text-xs text-slate-400">Section 2: Visibility &amp; Listing Management</span>
+              <span className="text-xs text-slate-400">Razorpay Gateway Enabled</span>
             </div>
             <h2 className="text-xl font-bold text-white tracking-tight mt-1">
               Partner Listing Tier &amp; Discovery Plan
             </h2>
             <p className="text-xs text-slate-300 max-w-2xl">
-              Choose your institution's visibility tier across the student discovery directory, search placement algorithms, and tele-sales counselor queue.
+              Choose your institution's visibility tier across the student discovery directory, search placement algorithms, and tele-sales counselor queue. Payments are settled securely via Razorpay with automated GST tax invoices.
             </p>
           </div>
 
@@ -222,10 +282,11 @@ export const ListingPlanManager: React.FC<ListingPlanManagerProps> = ({
                   type="button"
                   id={`select-plan-${plan.tier}`}
                   disabled={isCurrent}
-                  onClick={() => onUpdatePlan(plan.tier)}
-                  className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all ${plan.buttonClass}`}
+                  onClick={() => handleSelectPlan(plan.tier)}
+                  className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${plan.buttonClass}`}
                 >
-                  {plan.buttonText}
+                  {plan.tier !== 'free' && !isCurrent && <CreditCard className="w-3.5 h-3.5" />}
+                  <span>{plan.buttonText}</span>
                 </button>
               </div>
 
@@ -299,6 +360,21 @@ export const ListingPlanManager: React.FC<ListingPlanManagerProps> = ({
         </div>
       </div>
 
+      {/* Razorpay Checkout Modal */}
+      <RazorpayPaymentModal
+        isOpen={razorpayModalState.isOpen}
+        onClose={() => setRazorpayModalState(prev => ({ ...prev, isOpen: false }))}
+        amount={razorpayModalState.amount}
+        purpose={razorpayModalState.title}
+        studentName={institution.name}
+        studentEmail={institution.contacts.email}
+        studentPhone={institution.contacts.phone}
+        institutionName={institution.name}
+        paymentType="listing_plan"
+        onSuccess={handlePaymentSuccess}
+      />
+
     </div>
   );
 };
+

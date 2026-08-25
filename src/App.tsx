@@ -28,6 +28,43 @@ import { AdminRevenueControlView } from './components/AdminRevenueControlView';
 import { TelesalesWorkspaceView } from './components/TelesalesWorkspaceView';
 import { StudentDiscoveryView } from './components/StudentDiscoveryView';
 import { ListingPlanManager } from './components/ListingPlanManager';
+import { sendPaymentConfirmationEmail, sendDocumentReminderEmail, MockEmailNotification } from './services/emailNotificationService';
+
+/**
+ * Identifies student applications in 'Documents Pending' status for over 3 days.
+ * Calculates the calendar days elapsed between application submission date and today.
+ */
+export const getStudentsWithOverdueDocumentsPending = (
+  applications: StudentApplication[],
+  daysThreshold: number = 3
+): StudentApplication[] => {
+  if (!applications || !Array.isArray(applications)) return [];
+  const now = new Date();
+  
+  return applications.filter(app => {
+    if (app.status !== 'Documents Pending' || !app.submissionDate) return false;
+    const subDate = new Date(app.submissionDate);
+    if (isNaN(subDate.getTime())) return false;
+    const diffTime = now.getTime() - subDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > daysThreshold;
+  });
+};
+
+/**
+ * Checks if a specific student application has been in 'Documents Pending' status for over 3 days.
+ */
+export const isDocumentPendingOverdue = (
+  app: StudentApplication | null | undefined,
+  daysThreshold: number = 3
+): boolean => {
+  if (!app || app.status !== 'Documents Pending' || !app.submissionDate) return false;
+  const subDate = new Date(app.submissionDate);
+  if (isNaN(subDate.getTime())) return false;
+  const diffTime = new Date().getTime() - subDate.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays > daysThreshold;
+};
 
 export default function App() {
   const [currentMode, setCurrentMode] = useState<PlatformAppMode>('partner');
@@ -129,19 +166,147 @@ export default function App() {
   const handleUpdateApplicationStatus = (
     appId: string, 
     newStatus: StudentApplication['status'],
-    counsellingSlot?: string
+    counsellingSlot?: string,
+    paymentMeta?: { paymentId?: string; paymentReferenceId?: string; orderId?: string; amountPaid?: number; paidAt?: string; paymentTimestamp?: string }
   ) => {
-    setInstitutionsMap(prev => ({
-      ...prev,
-      [currentProfileType]: {
-        ...currentInstitution,
-        applications: currentInstitution.applications.map(app => 
-          app.id === appId 
-            ? { ...app, status: newStatus, ...(counsellingSlot ? { counsellingSlot } : {}) }
-            : app
-        )
-      }
-    }));
+    let updatedAppForEmail: StudentApplication | null = null;
+    let targetInstName: string = currentInstitution.name;
+
+    setInstitutionsMap(prev => {
+      const currentInst = prev[currentProfileType];
+      if (!currentInst) return prev;
+      targetInstName = currentInst.name;
+
+      return {
+        ...prev,
+        [currentProfileType]: {
+          ...currentInst,
+          applications: currentInst.applications.map(app => {
+            if (app.id !== appId) return app;
+
+            const isNowPaid = newStatus === 'Paid';
+            const timestamp = paymentMeta?.paidAt || paymentMeta?.paymentTimestamp || (isNowPaid ? new Date().toISOString() : app.paidAt);
+            const paymentRefId = paymentMeta?.paymentReferenceId || paymentMeta?.paymentId || app.paymentReferenceId || app.paymentId || (isNowPaid ? `PAY-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}` : undefined);
+
+            const updated: StudentApplication = { 
+              ...app, 
+              status: newStatus, 
+              ...(isNowPaid ? { 
+                applicationFeePaid: true, 
+                paidAt: timestamp,
+                paymentTimestamp: timestamp,
+                paymentId: paymentRefId,
+                paymentReferenceId: paymentRefId,
+                amountPaid: paymentMeta?.amountPaid ?? (app.amountPaid || 1500),
+                ...(paymentMeta?.orderId ? { orderId: paymentMeta.orderId } : {})
+              } : {}),
+              ...(counsellingSlot ? { counsellingSlot } : {}),
+              ...(paymentMeta || {})
+            };
+
+            if (isNowPaid) {
+              updatedAppForEmail = updated;
+            }
+
+            return updated;
+          })
+        }
+      };
+    });
+
+    // Trigger mock email confirmation service when status is updated to 'Paid'
+    if (newStatus === 'Paid' && updatedAppForEmail) {
+      const appToNotify: StudentApplication = updatedAppForEmail;
+      sendPaymentConfirmationEmail({
+        applicantName: appToNotify.applicantName,
+        email: appToNotify.email,
+        phone: appToNotify.phone,
+        applicationId: appToNotify.id,
+        programName: appToNotify.programName,
+        paymentReferenceId: appToNotify.paymentReferenceId || appToNotify.paymentId || `PAY-VERIFIED-${Date.now()}`,
+        orderId: appToNotify.orderId,
+        amountPaid: appToNotify.amountPaid || 1500,
+        paidAt: appToNotify.paidAt || new Date().toISOString(),
+        institutionName: targetInstName,
+        counsellingSlot: appToNotify.counsellingSlot || counsellingSlot
+      }).catch(err => {
+        console.error('Failed to trigger mock email notification:', err);
+      });
+    }
+  };
+
+  // Handler to send reminder notification to students with pending documents
+  const handleSendDocumentReminder = async (
+    app: StudentApplication,
+    customMessage?: string
+  ): Promise<MockEmailNotification | null> => {
+    try {
+      const subDate = new Date(app.submissionDate);
+      const diffDays = isNaN(subDate.getTime()) 
+        ? 4 
+        : Math.max(0, Math.floor((new Date().getTime() - subDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+      const notification = await sendDocumentReminderEmail({
+        applicantName: app.applicantName,
+        email: app.email,
+        phone: app.phone,
+        applicationId: app.id,
+        programName: app.programName,
+        institutionName: currentInstitution.name,
+        daysPending: diffDays,
+        pendingDocuments: app.pendingDocumentList,
+        customMessage
+      });
+
+      // Update application metadata with reminder timestamp and increment count
+      const nowIso = new Date().toISOString();
+      setInstitutionsMap(prev => {
+        const currentInst = prev[currentProfileType];
+        if (!currentInst) return prev;
+
+        return {
+          ...prev,
+          [currentProfileType]: {
+            ...currentInst,
+            applications: currentInst.applications.map(a => {
+              if (a.id !== app.id) return a;
+              return {
+                ...a,
+                lastReminderSentAt: nowIso,
+                reminderCount: (a.reminderCount || 0) + 1
+              };
+            })
+          }
+        };
+      });
+
+      return notification;
+    } catch (err) {
+      console.error('Failed to send document reminder notification:', err);
+      return null;
+    }
+  };
+
+  // Handler to log internal counselor / system notes to an application
+  const handleAddSystemNote = (appId: string, note: string) => {
+    setInstitutionsMap(prev => {
+      const currentInst = prev[currentProfileType];
+      if (!currentInst) return prev;
+
+      return {
+        ...prev,
+        [currentProfileType]: {
+          ...currentInst,
+          applications: currentInst.applications.map(a => {
+            if (a.id !== appId) return a;
+            return {
+              ...a,
+              systemNotes: [...(a.systemNotes || []), note]
+            };
+          })
+        }
+      };
+    });
   };
 
   // Handle new student application from Student Discovery Portal
@@ -370,6 +535,11 @@ export default function App() {
             <AdmissionManagementView
               institution={currentInstitution}
               onUpdateApplicationStatus={handleUpdateApplicationStatus}
+              handleUpdateApplicationStatus={handleUpdateApplicationStatus}
+              onAddSystemNote={handleAddSystemNote}
+              onSendDocumentReminder={handleSendDocumentReminder}
+              isDocumentPendingOverdue={isDocumentPendingOverdue}
+              getStudentsWithOverdueDocumentsPending={getStudentsWithOverdueDocumentsPending}
             />
           )}
 

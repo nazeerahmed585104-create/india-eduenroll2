@@ -278,8 +278,56 @@ export const INITIAL_INSTITUTIONS: Record<string, InstitutionProfileData> = {
         programName: 'B.Tech in Computer Science & AI',
         submissionDate: '2026-08-21',
         meritScoreOrRank: 'JEE Main: 96.2 %ile',
+        status: 'Accepted',
+        applicationFeePaid: false
+      },
+      {
+        id: 'APP-2026-905',
+        applicantName: 'Siddharth Roy',
+        email: 'siddharth.roy@gmail.com',
+        phone: '+91 98110 33421',
+        programId: 'prog-01',
+        programName: 'B.Tech in Computer Science & AI',
+        submissionDate: '2026-08-11',
+        meritScoreOrRank: 'JEE Main: 94.8 %ile',
         status: 'Under Review',
-        applicationFeePaid: true
+        applicationFeePaid: false
+      },
+      {
+        id: 'APP-2026-906',
+        applicantName: 'Meera Joshi',
+        email: 'meera.joshi@outlook.com',
+        phone: '+91 97200 48192',
+        programId: 'prog-02',
+        programName: 'B.Tech in Electronics & Communication',
+        submissionDate: '2026-08-14',
+        meritScoreOrRank: 'CET Rank: 4,120',
+        status: 'Under Review',
+        applicationFeePaid: false
+      },
+      {
+        id: 'APP-2026-907',
+        applicantName: 'Varun Nair',
+        email: 'varun.nair@gmail.com',
+        phone: '+91 96540 81230',
+        programId: 'prog-03',
+        programName: 'M.Tech in Data Science & Machine Learning',
+        submissionDate: '2026-08-23',
+        meritScoreOrRank: 'GATE Score: 680',
+        status: 'Under Review',
+        applicationFeePaid: false
+      },
+      {
+        id: 'APP-2026-904',
+        applicantName: 'Ananya Sharma',
+        email: 'ananya.sharma@gmail.com',
+        phone: '+91 98230 45671',
+        programId: 'prog-01',
+        programName: 'B.Tech in Computer Science & AI',
+        submissionDate: '2026-08-23',
+        meritScoreOrRank: 'CET Rank: 2,150 (97.1 %ile)',
+        status: 'Accepted',
+        applicationFeePaid: false
       },
       {
         id: 'APP-2026-903',
@@ -288,10 +336,37 @@ export const INITIAL_INSTITUTIONS: Record<string, InstitutionProfileData> = {
         phone: '+91 97654 32110',
         programId: 'prog-02',
         programName: 'B.Tech in Electronics & Communication',
-        submissionDate: '2026-08-22',
+        submissionDate: '2026-08-19',
         meritScoreOrRank: 'CET Rank: 8,910',
         status: 'Documents Pending',
-        applicationFeePaid: true
+        applicationFeePaid: true,
+        pendingDocumentList: ['12th HSC Marksheet', 'CET Scorecard', 'Domicile Certificate']
+      },
+      {
+        id: 'APP-2026-908',
+        applicantName: 'Tanvi Deshpande',
+        email: 'tanvi.d@gmail.com',
+        phone: '+91 98334 55120',
+        programId: 'prog-01',
+        programName: 'B.Tech in Computer Science & AI',
+        submissionDate: '2026-08-20',
+        meritScoreOrRank: 'JEE Main: 91.5 %ile',
+        status: 'Documents Pending',
+        applicationFeePaid: false,
+        pendingDocumentList: ['Class 10th & 12th Marksheets', 'Photo ID Proof']
+      },
+      {
+        id: 'APP-2026-909',
+        applicantName: 'Kabir Verma',
+        email: 'kabir.v@gmail.com',
+        phone: '+91 98112 33490',
+        programId: 'prog-03',
+        programName: 'M.Tech in Data Science & Machine Learning',
+        submissionDate: '2026-08-24',
+        meritScoreOrRank: 'GATE Score: 640',
+        status: 'Documents Pending',
+        applicationFeePaid: false,
+        pendingDocumentList: ['B.Tech Degree Certificate']
       }
     ],
     enquiries: [

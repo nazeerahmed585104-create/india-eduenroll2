@@ -108,6 +108,26 @@ export interface FacultyMember {
   specialization: string;
 }
 
+export interface ApplicationActivityEvent {
+  id: string;
+  timestamp: string;
+  title: string;
+  type: 'status_change' | 'payment' | 'system_note' | 'reminder_sent' | 'counselling' | 'document_uploaded' | 'submission' | 'merit_evaluation';
+  description: string;
+  actor?: string;
+  statusFrom?: string;
+  statusTo?: string;
+  paymentDetails?: {
+    paymentId?: string;
+    orderId?: string;
+    amount?: number;
+    paymentMethod?: string;
+    paidAt?: string;
+  };
+  metadata?: Record<string, any>;
+  notes?: string;
+}
+
 export interface StudentApplication {
   id: string;
   applicantName: string;
@@ -117,9 +137,20 @@ export interface StudentApplication {
   programName: string;
   submissionDate: string;
   meritScoreOrRank?: string;
-  status: 'Merit Selected' | 'Under Review' | 'Documents Pending' | 'Confirmed' | 'Rejected';
+  status: 'Accepted' | 'Paid' | 'Merit Selected' | 'Under Review' | 'Documents Pending' | 'Confirmed' | 'Rejected';
   applicationFeePaid: boolean;
   counsellingSlot?: string;
+  paymentId?: string;
+  paymentReferenceId?: string;
+  orderId?: string;
+  amountPaid?: number;
+  paidAt?: string;
+  paymentTimestamp?: string;
+  lastReminderSentAt?: string;
+  reminderCount?: number;
+  pendingDocumentList?: string[];
+  systemNotes?: string[];
+  activityTimeline?: ApplicationActivityEvent[];
 }
 
 export interface EnquiryLead {

@@ -38,9 +38,15 @@ import {
   DollarSign,
   Download,
   Send,
-  HelpCircle
+  HelpCircle,
+  Zap,
+  Lock,
+  ArrowUpRight
 } from 'lucide-react';
 import { CourseProgram, InstitutionProfileData, StudentApplication, ListingPlanTier } from '../types/education';
+import { RazorpayPaymentModal } from './RazorpayPaymentModal';
+import { PaymentGateway } from './PaymentGateway';
+import { RazorpayTransactionRecord } from '../types/razorpay';
 
 interface StudentDiscoveryViewProps {
   institutions: Record<string, InstitutionProfileData>;
@@ -86,6 +92,57 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
   const [applicantScore, setApplicantScore] = useState<string>('94.8% (12th Board)');
   const [selectedPaymentMode, setSelectedPaymentMode] = useState<'online' | 'upi' | 'netbanking'>('online');
   const [applySuccessMsg, setApplySuccessMsg] = useState<string | null>(null);
+
+  // Razorpay Gateway State for Student
+  const [razorpayModal, setRazorpayModal] = useState<{
+    isOpen: boolean;
+    amount: number;
+    purpose: string;
+    courseName?: string;
+    institutionName?: string;
+    paymentType?: 'application_fee' | 'tuition_fee';
+    onComplete?: (tx: RazorpayTransactionRecord) => void;
+  }>({
+    isOpen: false,
+    amount: 1500,
+    purpose: 'Application Processing Fee'
+  });
+
+  // Dedicated PaymentGateway component state for student course application checkout flow
+  const [paymentGatewayModal, setPaymentGatewayModal] = useState<{
+    isOpen: boolean;
+    application: StudentApplication | null;
+    course: CourseProgram | null;
+    institution: InstitutionProfileData | null;
+    amount: number;
+  }>({
+    isOpen: false,
+    application: null,
+    course: null,
+    institution: null,
+    amount: 1500
+  });
+
+  const [studentPaymentsList, setStudentPaymentsList] = useState<RazorpayTransactionRecord[]>([
+    {
+      id: 'tx_init_std_001',
+      orderId: 'order_K8d82Jsa92m',
+      paymentId: 'pay_Q81kLm9281a',
+      amount: 1500,
+      currency: 'INR',
+      purpose: 'B.Tech Application Processing Fee Token',
+      studentName: 'Aarav Sharma',
+      studentEmail: 'aarav.sharma@example.com',
+      institutionName: 'National Institute of Technology',
+      method: 'upi',
+      status: 'captured',
+      date: new Date(Date.now() - 3600000 * 24).toISOString(),
+      gstAmount: 228.81,
+      baseAmount: 1271.19,
+      escrowStatus: 'SETTLED_TO_COLLEGE',
+      invoiceNumber: 'INV-2026-884920'
+    }
+  ]);
 
   // Quick Enquiry Form state
   const [enquiryName, setEnquiryName] = useState<string>('Aarav Sharma');
@@ -226,38 +283,32 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
     e.preventDefault();
     if (!applyModalItem || !applicantName || !applicantEmail || !applicantPhone) return;
 
-    const newApp: StudentApplication = {
+    const currentItem = applyModalItem;
+    
+    // Create initial pending application object
+    const pendingApp: StudentApplication = {
       id: `APP-2026-${Math.floor(10000 + Math.random() * 90000)}`,
       applicantName,
       email: applicantEmail,
       phone: applicantPhone,
-      programId: applyModalItem.course.id,
-      programName: applyModalItem.course.name,
+      programId: currentItem.course.id,
+      programName: currentItem.course.name,
       submissionDate: new Date().toISOString().split('T')[0],
       meritScoreOrRank: applicantScore || 'Under Evaluation',
       status: 'Under Review',
-      applicationFeePaid: true,
+      applicationFeePaid: false,
       counsellingSlot: 'Aug 28, 2026 - 10:30 AM (Online Meet)'
     };
 
-    onApplyCourse(newApp);
-    setApplySuccessMsg(`Application submitted successfully! Application Ref: ${newApp.id}`);
+    // Close application form modal and launch PaymentGateway
     setApplyModalItem(null);
-
-    // Add to notification list
-    setNotifications(prev => [
-      {
-        id: `notif-${Date.now()}`,
-        title: `Application Registered: ${applyModalItem.course.name}`,
-        message: `Your admission request for ${applyModalItem.inst.name} is in review. Ref: ${newApp.id}`,
-        date: 'Just now',
-        unread: true,
-        type: 'admission'
-      },
-      ...prev
-    ]);
-
-    setTimeout(() => setApplySuccessMsg(null), 6000);
+    setPaymentGatewayModal({
+      isOpen: true,
+      application: pendingApp,
+      course: currentItem.course,
+      institution: currentItem.inst,
+      amount: 1500
+    });
   };
 
   const handleSubmitEnquiry = (e: React.FormEvent) => {
@@ -939,12 +990,18 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono text-indigo-400 font-bold">{app.id}</span>
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                          app.status === 'Paid' ? 'bg-emerald-950 text-emerald-300 border-emerald-500/60 shadow-sm' :
                           app.status === 'Confirmed' ? 'bg-emerald-950 text-emerald-300 border-emerald-700' :
                           app.status === 'Merit Selected' ? 'bg-indigo-950 text-indigo-300 border-indigo-700' :
                           'bg-amber-950 text-amber-300 border-amber-700'
                         }`}>
                           {app.status}
                         </span>
+                        {app.paymentId && (
+                          <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[9px]">
+                            {app.paymentId}
+                          </span>
+                        )}
                       </div>
                       <h3 className="text-base font-bold text-white mt-1">{app.programName}</h3>
                       <p className="text-xs text-slate-400">{instName}</p>
@@ -971,15 +1028,46 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs pt-1">
-                    <span className="text-slate-400 text-[11px]">Application Fee: <strong className="text-emerald-400">Paid (₹1,500)</strong></span>
-                    <button 
-                      onClick={() => alert(`Downloading verified admission application slip for ${app.id}...`)}
-                      className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-semibold"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download Admission Slip (PDF)</span>
-                    </button>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs pt-1 gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 text-[11px]">
+                        Application Fee: {app.applicationFeePaid || app.status === 'Paid' ? (
+                          <strong className="text-emerald-400">Paid (₹1,500 via Razorpay)</strong>
+                        ) : (
+                          <strong className="text-amber-400">Pending</strong>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {(!app.applicationFeePaid && app.status !== 'Paid') && (
+                        <button
+                          onClick={() => {
+                            const inst = allInstArray.find(i => i.name === instName);
+                            const prog = inst?.programs.find(p => p.id === app.programId);
+                            setPaymentGatewayModal({
+                              isOpen: true,
+                              application: app,
+                              course: prog || null,
+                              institution: inst || null,
+                              amount: 1500
+                            });
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold flex items-center gap-1 shadow transition"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>Pay ₹1,500 via Razorpay</span>
+                        </button>
+                      )}
+
+                      <button 
+                        onClick={() => alert(`Downloading verified admission application slip for ${app.id}...`)}
+                        className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-semibold"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download Admission Slip (PDF)</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -1004,25 +1092,55 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
       {activeStudentTab === 'payments' && (
         <div className="space-y-6">
           <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 space-y-2">
-            <div className="flex items-center space-x-2">
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                Zero Surcharge Student Gateway
-              </span>
-              <span className="text-xs text-slate-400">Direct Tuition &amp; Token Clearing</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    Razorpay Gateway Enabled
+                  </span>
+                  <span className="text-xs text-slate-400">Zero Student Surcharge</span>
+                </div>
+                <h2 className="text-xl font-bold text-white tracking-tight mt-1">
+                  Tuition Fee Payments &amp; Invoices
+                </h2>
+                <p className="text-xs text-slate-300 max-w-2xl">
+                  Pay academic tuition fees, token fees, and installment schedules securely through Razorpay with instant GST tax receipts.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setRazorpayModal({
+                      isOpen: true,
+                      amount: 45000,
+                      purpose: 'Semester 1 Academic Tuition Fee',
+                      institutionName: 'National Institute of Technology',
+                      courseName: 'B.Tech in Computer Science & AI',
+                      paymentType: 'tuition_fee',
+                      onComplete: (tx) => {
+                        setStudentPaymentsList(prev => [tx, ...prev]);
+                        alert(`Semester 1 Fee Paid Successfully! Invoice: ${tx.invoiceNumber}`);
+                      }
+                    });
+                  }}
+                  id="pay-tuition-razorpay-btn"
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center space-x-2 shadow-lg shadow-indigo-950 transition"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Pay Tuition via Razorpay</span>
+                </button>
+              </div>
             </div>
-            <h2 className="text-xl font-bold text-white tracking-tight">
-              Tuition Fee Payments &amp; Invoices
-            </h2>
-            <p className="text-xs text-slate-300 max-w-2xl">
-              Pay academic tuition fees, view installment schedules, and download GST tax receipts.
-            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-              <div className="text-xs text-slate-400">Total Fees Paid</div>
-              <div className="text-2xl font-extrabold text-emerald-400">₹1,500</div>
-              <div className="text-[11px] text-slate-400">Application Token Verification</div>
+              <div className="text-xs text-slate-400">Total Fees Paid via Razorpay</div>
+              <div className="text-2xl font-extrabold text-emerald-400">
+                ₹{studentPaymentsList.reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}
+              </div>
+              <div className="text-[11px] text-slate-400">{studentPaymentsList.length} Verified Transactions</div>
             </div>
 
             <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
@@ -1037,36 +1155,93 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
                 <ShieldCheck className="w-6 h-6 text-indigo-400" />
                 <span>256-Bit SSL</span>
               </div>
-              <div className="text-[11px] text-slate-400">RBI compliant escrow clearing</div>
+              <div className="text-[11px] text-slate-400">Razorpay RBI compliant escrow clearing</div>
             </div>
           </div>
 
+          {/* Quick Pay Options */}
+          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-400" />
+              <span>Instant Fee Payment Slabs (Powered by Razorpay)</span>
+            </h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { title: 'Application Token', amount: 1500, desc: 'Instant application verification token', type: 'application_fee' as const },
+                { title: 'Semester 1 Tuition', amount: 45000, desc: 'Covers lab fees, lectures & registration', type: 'tuition_fee' as const },
+                { title: 'Full Academic Year', amount: 90000, desc: 'Annual tuition + scholarship deduction', type: 'tuition_fee' as const }
+              ].map((slab, i) => (
+                <div key={i} className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="font-bold text-xs text-white">{slab.title}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">{slab.desc}</div>
+                    <div className="text-lg font-extrabold text-emerald-400 mt-2">₹{slab.amount.toLocaleString()}</div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRazorpayModal({
+                        isOpen: true,
+                        amount: slab.amount,
+                        purpose: slab.title,
+                        institutionName: 'National Institute of Technology',
+                        courseName: 'B.Tech in Computer Science & AI',
+                        paymentType: slab.type,
+                        onComplete: (tx) => {
+                          setStudentPaymentsList(prev => [tx, ...prev]);
+                        }
+                      });
+                    }}
+                    className="w-full py-2 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Pay ₹{slab.amount.toLocaleString()}</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Past Payment Receipts */}
           <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <FileText className="w-4 h-4 text-indigo-400" />
-              <span>Past Payment Receipts</span>
+              <span>Razorpay Verified Payment Receipts ({studentPaymentsList.length})</span>
             </h3>
 
             <div className="space-y-3 text-xs">
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="font-bold text-white">Application Registration Token</div>
-                  <div className="text-slate-400 text-[11px]">Txn ID: TXN-STUDENT-88492 &bull; August 20, 2026</div>
+              {studentPaymentsList.map((tx) => (
+                <div key={tx.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="font-bold text-white text-sm">{tx.purpose}</div>
+                    <div className="text-slate-400 text-[11px] flex flex-wrap gap-2 mt-1">
+                      <span>Order ID: <strong className="text-slate-300 font-mono">{tx.orderId}</strong></span>
+                      <span>&bull;</span>
+                      <span>Payment ID: <strong className="text-emerald-400 font-mono">{tx.paymentId}</strong></span>
+                      <span>&bull;</span>
+                      <span>Method: <strong className="uppercase text-indigo-400">{tx.method}</strong></span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3 shrink-0">
+                    <div className="text-right">
+                      <span className="font-extrabold text-white text-sm">₹{tx.amount.toLocaleString()}</span>
+                      <span className="text-[10px] text-slate-400 block">{new Date(tx.date).toLocaleDateString()}</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] font-bold">
+                      CAPTURED
+                    </span>
+                    <button 
+                      onClick={() => alert(`Downloading verified Tax Invoice Receipt ${tx.invoiceNumber} (PDF)...`)}
+                      className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                      title="Download Tax Receipt"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <span className="font-extrabold text-white text-sm">₹1,500</span>
-                  <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] font-bold">
-                    Successful
-                  </span>
-                  <button 
-                    onClick={() => alert('Downloading official GST payment receipt PDF...')}
-                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
-                    title="Download Tax Receipt"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1296,10 +1471,10 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
                 <button
                   type="submit"
                   id="submit-student-app-btn"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-lg shadow-indigo-950"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-lg shadow-indigo-950 transition"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Submit Admission Form</span>
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Pay ₹1,500 via Razorpay &amp; Apply</span>
                 </button>
               </div>
 
@@ -1383,6 +1558,82 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
         </div>
       )}
 
+      {/* ----------------- RAZORPAY GATEWAY CHECKOUT MODAL ----------------- */}
+      <RazorpayPaymentModal
+        isOpen={razorpayModal.isOpen}
+        onClose={() => setRazorpayModal(prev => ({ ...prev, isOpen: false }))}
+        amount={razorpayModal.amount}
+        purpose={razorpayModal.purpose}
+        studentName={applicantName}
+        studentEmail={applicantEmail}
+        studentPhone={applicantPhone}
+        courseName={razorpayModal.courseName}
+        institutionName={razorpayModal.institutionName}
+        paymentType={razorpayModal.paymentType || 'application_fee'}
+        onSuccess={(tx) => {
+          if (razorpayModal.onComplete) {
+            razorpayModal.onComplete(tx);
+          }
+        }}
+      />
+
+      {/* ----------------- PAYMENT GATEWAY COMPONENT (TEST FLOW FOR STUDENT APPLICATIONS) ----------------- */}
+      <PaymentGateway
+        isOpen={paymentGatewayModal.isOpen}
+        onClose={() => setPaymentGatewayModal(prev => ({ ...prev, isOpen: false }))}
+        application={paymentGatewayModal.application}
+        course={paymentGatewayModal.course}
+        institution={paymentGatewayModal.institution}
+        amount={paymentGatewayModal.amount}
+        onSuccess={(updatedApp, paymentDetails) => {
+          // Update status to Paid and save to applications
+          onApplyCourse(updatedApp);
+          
+          // Add to student payment records
+          const newTxRecord: RazorpayTransactionRecord = {
+            id: `tx_${Date.now()}`,
+            orderId: paymentDetails.orderId || updatedApp.orderId || `order_${Math.random().toString(36).substring(2, 9)}`,
+            paymentId: paymentDetails.paymentId || updatedApp.paymentId || `pay_${Math.random().toString(36).substring(2, 9)}`,
+            amount: paymentGatewayModal.amount,
+            currency: 'INR',
+            purpose: `Application Token Fee - ${updatedApp.programName}`,
+            studentName: updatedApp.applicantName,
+            studentEmail: updatedApp.email,
+            institutionName: paymentGatewayModal.institution?.name || 'Partner Educational Institution',
+            courseName: updatedApp.programName,
+            method: 'upi',
+            status: 'captured',
+            date: new Date().toISOString(),
+            gstAmount: Math.round(paymentGatewayModal.amount * 0.18 * 100) / 100,
+            baseAmount: Math.round((paymentGatewayModal.amount / 1.18) * 100) / 100,
+            escrowStatus: 'SETTLED_TO_COLLEGE',
+            invoiceNumber: `INV-2026-${Math.floor(100000 + Math.random() * 900000)}`
+          };
+
+          setStudentPaymentsList(prev => [newTxRecord, ...prev]);
+          setApplySuccessMsg(`Payment captured successfully! Application status updated to 'Paid'. Ref: ${updatedApp.id}`);
+
+          // Notification alert
+          setNotifications(prev => [
+            {
+              id: `notif-${Date.now()}`,
+              title: `Application Paid & Confirmed: ${updatedApp.programName}`,
+              message: `Application ${updatedApp.id} status is now Paid. Payment ID: ${updatedApp.paymentId}`,
+              date: 'Just now',
+              unread: true,
+              type: 'admission'
+            },
+            ...prev
+          ]);
+
+          setTimeout(() => setApplySuccessMsg(null), 7000);
+        }}
+        onFailure={(err) => {
+          console.warn('Payment failed callback:', err);
+        }}
+      />
+
     </div>
   );
 };
+
