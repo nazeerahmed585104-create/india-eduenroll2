@@ -24,12 +24,14 @@ import {
   DollarSign,
   PhoneCall,
   Compass,
-  Briefcase
+  Briefcase,
+  BrainCircuit,
+  Sparkles
 } from 'lucide-react';
 import { ProfileType, InstitutionProfileData } from '../types/education';
 import { PROFILE_TYPES_CONFIG } from '../data/institutionsData';
 
-export type PlatformAppMode = 'student' | 'partner' | 'telesales' | 'admin_revenue';
+export type PlatformAppMode = 'student' | 'partner' | 'telesales' | 'admin_revenue' | 'crm_marketing';
 
 interface HeaderProps {
   currentMode: PlatformAppMode;
@@ -94,6 +96,19 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
 
             <button
+              id="mode-switch-crm-marketing"
+              onClick={() => onSelectMode('crm_marketing')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition ${
+                currentMode === 'crm_marketing'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-950'
+                  : 'text-indigo-300 hover:text-white hover:bg-slate-900 border border-indigo-900/60'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>AI CRM + Marketing Suite (12 Modules)</span>
+            </button>
+
+            <button
               id="mode-switch-student"
               onClick={() => onSelectMode('student')}
               className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
@@ -103,7 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Compass className="w-3.5 h-3.5" />
-              <span>Student Discovery Portal</span>
+              <span>Student Discovery</span>
             </button>
 
             <button
@@ -129,7 +144,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <PhoneCall className="w-3.5 h-3.5" />
-              <span>Tele-sales Workspace</span>
+              <span>Tele-sales</span>
             </button>
 
             <button
@@ -142,13 +157,13 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <DollarSign className="w-3.5 h-3.5" />
-              <span>Admin Revenue &amp; Business Engine</span>
+              <span>Admin Revenue</span>
             </button>
           </div>
 
           <div className="hidden lg:flex items-center space-x-2 text-[11px] text-slate-400">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Configurable Revenue Slabs Active</span>
+            <span>12-Module AI Marketing Suite Online</span>
           </div>
         </div>
       </div>
@@ -166,11 +181,13 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="flex items-center space-x-2">
                 <span className="font-bold text-base tracking-tight text-white">EduPlatform</span>
                 <span className="text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  {currentMode === 'student' ? 'Student View' : currentMode === 'admin_revenue' ? 'Business Admin' : currentMode === 'telesales' ? 'Tele-sales' : 'Partner Portal'}
+                  {currentMode === 'crm_marketing' ? 'AI CRM & Marketing' : currentMode === 'student' ? 'Student View' : currentMode === 'admin_revenue' ? 'Business Admin' : currentMode === 'telesales' ? 'Tele-sales' : 'Partner Portal'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                {currentMode === 'admin_revenue' 
+                {currentMode === 'crm_marketing'
+                  ? 'AI Automation, WhatsApp CRM, Email Marketing, SEO & Ads'
+                  : currentMode === 'admin_revenue' 
                   ? 'Configurable Revenue Model, Fees & Settlements'
                   : currentMode === 'telesales'
                   ? 'Prospective Student Inquiries & Incentive Tracker'

@@ -13,7 +13,9 @@ import {
   Sparkles,
   ChevronRight,
   ExternalLink,
-  Plus
+  Plus,
+  Scale,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -265,16 +267,31 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   <Clock className="w-4 h-4 text-amber-400" />
                 )}
               </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-indigo-950/40 border border-indigo-900/60">
+                <span className="text-indigo-200">Regulatory Audit &amp; Expiry</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-amber-950 text-amber-300 border border-amber-800">
+                  4 Near Expiry
+                </span>
+              </div>
             </div>
           </div>
 
-          <button
-            onClick={() => onNavigate('kyc')}
-            className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold flex items-center justify-center space-x-2 transition-colors"
-          >
-            <ShieldCheck className="w-4 h-4 text-indigo-400" />
-            <span>Open Verification Hub (Section 2)</span>
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => onNavigate('regulatory_audit')}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold flex items-center justify-center space-x-2 shadow-md shadow-indigo-950 transition-all"
+            >
+              <Scale className="w-4 h-4 text-amber-300" />
+              <span>Regulatory Audit Dashboard (Recharts)</span>
+            </button>
+            <button
+              onClick={() => onNavigate('kyc')}
+              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-medium flex items-center justify-center space-x-1.5 transition-colors"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Verification Hub (Section 2)</span>
+            </button>
+          </div>
         </div>
 
       </div>

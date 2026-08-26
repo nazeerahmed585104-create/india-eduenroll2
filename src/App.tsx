@@ -28,6 +28,8 @@ import { AdminRevenueControlView } from './components/AdminRevenueControlView';
 import { TelesalesWorkspaceView } from './components/TelesalesWorkspaceView';
 import { StudentDiscoveryView } from './components/StudentDiscoveryView';
 import { ListingPlanManager } from './components/ListingPlanManager';
+import { EnterprisePlatformSuite } from './components/crm/EnterprisePlatformSuite';
+import { RegulatoryAuditView } from './components/RegulatoryAuditView';
 import { sendPaymentConfirmationEmail, sendDocumentReminderEmail, MockEmailNotification } from './services/emailNotificationService';
 
 /**
@@ -92,7 +94,9 @@ export default function App() {
   // Switch Platform Portal Mode
   const handleSelectMode = (mode: PlatformAppMode) => {
     setCurrentMode(mode);
-    if (mode === 'admin_revenue') {
+    if (mode === 'crm_marketing') {
+      setActiveView('crm_suite');
+    } else if (mode === 'admin_revenue') {
       setActiveView('admin_revenue');
     } else if (mode === 'telesales') {
       setActiveView('telesales');
@@ -471,8 +475,13 @@ export default function App() {
         {/* Content Canvas */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-y-auto">
           
+          {/* AI CRM & DIGITAL MARKETING PLATFORM (12 MODULES) */}
+          {(currentMode === 'crm_marketing' || activeView === 'crm_suite') && (
+            <EnterprisePlatformSuite />
+          )}
+
           {/* STUDENT DISCOVERY MODE */}
-          {currentMode === 'student' && (
+          {currentMode === 'student' && activeView !== 'crm_suite' && (
             <StudentDiscoveryView
               institutions={institutionsMap}
               onApplyCourse={handleApplyCourseFromDiscovery}
@@ -480,7 +489,7 @@ export default function App() {
           )}
 
           {/* TELESALES WORKSPACE MODE */}
-          {currentMode === 'telesales' && (
+          {currentMode === 'telesales' && activeView !== 'crm_suite' && (
             <TelesalesWorkspaceView
               leadIncentiveRate={telesalesConfig.leadIncentiveAmount}
               admissionIncentiveRate={telesalesConfig.admissionIncentiveAmount}
@@ -488,7 +497,7 @@ export default function App() {
           )}
 
           {/* ADMIN BUSINESS & REVENUE CONTROL MODE */}
-          {currentMode === 'admin_revenue' && (
+          {currentMode === 'admin_revenue' && activeView !== 'crm_suite' && (
             <AdminRevenueControlView
               revenueConfigs={revenueConfigs}
               onUpdateRevenueConfigs={setRevenueConfigs}
@@ -498,7 +507,7 @@ export default function App() {
           )}
 
           {/* PARTNER WORKSPACE VIEWS */}
-          {currentMode === 'partner' && activeView === 'dashboard' && (
+          {currentMode === 'partner' && activeView !== 'crm_suite' && activeView === 'dashboard' && (
             <DashboardOverview
               institution={currentInstitution}
               onNavigate={setActiveView}
@@ -555,6 +564,12 @@ export default function App() {
               institution={currentInstitution}
               onAddEnquiry={handleAddEnquiry}
               onUpdateLeadStatus={handleUpdateLeadStatus}
+            />
+          )}
+
+          {currentMode === 'partner' && activeView === 'regulatory_audit' && (
+            <RegulatoryAuditView
+              institution={currentInstitution}
             />
           )}
 

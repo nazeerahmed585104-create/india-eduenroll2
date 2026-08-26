@@ -17,7 +17,8 @@ import {
   PhoneCall,
   Compass,
   Settings,
-  FileText
+  FileText,
+  Scale
 } from 'lucide-react';
 import { ProfileType } from '../types/education';
 import { PlatformAppMode } from './Header';
@@ -115,6 +116,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     { id: 'admissions', label: 'Admissions & Forms', icon: <UserCheck className="w-4 h-4" />, count: pendingApplicationsCount },
     { id: 'specialized', label: specialized.label, icon: specialized.icon, subBadge: specialized.badge },
     { id: 'enquiries', label: 'Enquiries & Leads', icon: <Users className="w-4 h-4" /> },
+    { id: 'regulatory_audit', label: 'Regulatory Audit', icon: <Scale className="w-4 h-4 text-emerald-400" />, subBadge: 'Recharts & Expiry' },
     { id: 'kyc', label: 'KYC & Verification Hub', icon: <ShieldCheck className="w-4 h-4" /> },
     { id: 'documents', label: 'Documents & Affiliations', icon: <FileCheck2 className="w-4 h-4" /> }
   ];
@@ -125,6 +127,55 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
       {/* Navigation Links */}
       <div className="p-4 space-y-1 flex-1">
         
+        {/* If Mode is CRM & Digital Marketing Suite */}
+        {currentMode === 'crm_marketing' && (
+          <div className="space-y-1">
+            <div className="text-[11px] font-semibold text-indigo-400 uppercase tracking-wider px-3 py-2 flex items-center justify-between">
+              <span>Growth Suite (12 Mod)</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">PRO</span>
+            </div>
+            
+            <button
+              onClick={() => onSelectView('crm_suite')}
+              className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-950"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>Full Growth Command Center</span>
+            </button>
+
+            <div className="pt-2 text-[10px] text-slate-400 px-3 space-y-1.5">
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>AI Lead Scoring &amp; Qualification</span>
+              </div>
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Email Campaigns &amp; Drips</span>
+              </div>
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>WhatsApp CRM &amp; Broadcasts</span>
+              </div>
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Kanban Sales Pipeline</span>
+              </div>
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>SEO Rank &amp; Ad Trackers</span>
+              </div>
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Lead Gen &amp; CSV Ingestion</span>
+              </div>
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                <span>Zero Frontend Credential Leak</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* If Mode is Partner */}
         {currentMode === 'partner' && (
           <>
@@ -246,6 +297,27 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-2">
             Platform Ecosystem
           </div>
+
+          <button
+            id="nav-item-crm-marketing-suite"
+            onClick={() => {
+              onSelectMode('crm_marketing');
+              onSelectView('crm_suite');
+            }}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all mb-1 ${
+              currentMode === 'crm_marketing'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-950 font-semibold'
+                : 'text-indigo-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <div className="flex items-center space-x-3">
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>CRM &amp; Growth Engine</span>
+            </div>
+            <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 font-bold">
+              12 Mod
+            </span>
+          </button>
 
           <button
             id="nav-item-backend"
