@@ -24,6 +24,19 @@ export interface DocumentReminderEmailParams {
   customMessage?: string;
 }
 
+export interface DocumentRenewalEmailParams {
+  documentId: string;
+  documentName: string;
+  documentType?: string;
+  institutionName?: string;
+  expiryDate?: string;
+  complianceOfficerName?: string;
+  complianceOfficerEmail: string;
+  issuingAuthority?: string;
+  requestedBy?: string;
+  customMessage?: string;
+}
+
 export interface MockEmailNotification {
   id: string;
   to: string;
@@ -31,18 +44,23 @@ export interface MockEmailNotification {
   subject: string;
   bodyText: string;
   bodyHtml: string;
-  type: 'payment_confirmation' | 'application_update' | 'document_reminder';
+  type: 'payment_confirmation' | 'application_update' | 'document_reminder' | 'document_renewal_request';
   sentAt: string;
   status: 'Delivered' | 'Sent';
   metadata: {
-    applicationId: string;
+    applicationId?: string;
+    documentId?: string;
+    documentName?: string;
     paymentReferenceId?: string;
     amountPaid?: number;
-    programName: string;
-    institutionName: string;
+    programName?: string;
+    institutionName?: string;
     orderId?: string;
     daysPending?: number;
     pendingDocuments?: string[];
+    expiryDate?: string;
+    issuingAuthority?: string;
+    complianceOfficerEmail?: string;
   };
 }
 
@@ -361,6 +379,182 @@ ${institution}
   }
 
   console.log(`[Email Service] Document reminder sent to ${params.email} (${params.applicantName}):`, notification);
+
+  return notification;
+};
+
+/**
+ * Triggers an automated official email notification to the compliance officer
+ * when an institutional regulatory document or accreditation certificate is nearing expiry.
+ */
+export const sendComplianceRenewalEmail = async (
+  params: DocumentRenewalEmailParams
+): Promise<MockEmailNotification> => {
+  const institution = params.institutionName || 'Higher Education Institution';
+  const officerName = params.complianceOfficerName || 'Institutional Compliance Officer';
+  const issuingAuthority = params.issuingAuthority || 'Statutory Regulatory Authority';
+  const expiryDate = params.expiryDate || 'Upcoming Regulatory Review Cycle';
+  const requestedBy = params.requestedBy || 'Office of the Registrar & Admissions Directorate';
+  const timestamp = new Date().toISOString();
+  const formattedDate = new Date(timestamp).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+  const formattedTime = new Date(timestamp).toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  const subject = `[URGENT COMPLIANCE ACTION] Document Renewal Notice: ${params.documentName} [Doc ID: ${params.documentId}]`;
+
+  const bodyText = `
+Dear ${officerName},
+
+This is an automated regulatory compliance alert for ${institution}.
+
+The institutional document "${params.documentName}" (ID: ${params.documentId}) has been flagged as NEARING EXPIRY. Immediate action is required to submit the formal renewal requisition to ${issuingAuthority} before the validity cutoff date (${expiryDate}).
+
+--- COMPLIANCE DOCUMENT RECORD ---
+- Document Name: ${params.documentName}
+- Document ID: ${params.documentId}
+- Category / Type: ${params.documentType || 'Regulatory Accreditation / Statutory Approval'}
+- Issuing Authority: ${issuingAuthority}
+- Expiration Validity Date: ${expiryDate}
+- Initiated By: ${requestedBy}
+- Notice Timestamp: ${formattedDate} at ${formattedTime}
+- Status: NEARING EXPIRY — RENEWAL DISPATCHED
+
+${params.customMessage ? `\n--- INTERNAL DIRECTIVE / NOTES ---\n${params.customMessage}\n` : ''}
+
+--- REQUIRED COMPLIANCE ACTIONS ---
+1. Prepare and submit the statutory renewal application to ${issuingAuthority}.
+2. Secure the acknowledgment receipt or provisional extension letter.
+3. Upload the certified renewal copy or docket receipt to the Institutional Document Vault.
+4. Update the accreditation status to ensure uninterrupted admissions operations and UGC/AICTE compliance audits.
+
+Please acknowledge receipt of this automated notification and update the compliance desk log.
+
+Warm regards,
+Regulatory Compliance & Quality Assurance Cell
+${institution}
+`.trim();
+
+  const bodyHtml = `
+<div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+  <div style="background: #0f172a; padding: 24px; color: #ffffff; border-bottom: 4px solid #f59e0b;">
+    <div style="display: inline-block; padding: 4px 10px; background: #78350f; color: #fde68a; border-radius: 6px; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 8px;">
+      Regulatory Compliance Notice &bull; Nearing Expiry
+    </div>
+    <h2 style="margin: 0 0 6px 0; font-size: 20px; font-weight: bold; color: #ffffff;">${institution}</h2>
+    <p style="margin: 0; font-size: 13px; color: #94a3b8;">Office of the Registrar &bull; Statutory Accreditation Desk</p>
+  </div>
+  
+  <div style="padding: 24px;">
+    <p style="font-size: 15px; color: #1e293b; margin-top: 0;">Dear <strong>${officerName}</strong>,</p>
+    <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+      An automated audit scan has flagged the following statutory document as <strong>Nearing Expiry</strong>. You are requested to initiate the renewal process with the issuing body immediately to maintain institutional accreditation and admissions eligibility.
+    </p>
+
+    <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 18px; margin: 20px 0;">
+      <h3 style="margin: 0 0 12px 0; font-size: 14px; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">
+        Document Renewal Specifications
+      </h3>
+      <table style="width: 100%; font-size: 13px; color: #334155; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 5px 0; color: #78350f; font-weight: 600; width: 40%;">Document Name:</td>
+          <td style="padding: 5px 0; font-weight: bold; color: #0f172a;">${params.documentName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 0; color: #78350f; font-weight: 600;">Document ID:</td>
+          <td style="padding: 5px 0; font-family: monospace; color: #0f172a;">${params.documentId}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 0; color: #78350f; font-weight: 600;">Issuing Authority:</td>
+          <td style="padding: 5px 0; color: #0f172a;">${issuingAuthority}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 0; color: #78350f; font-weight: 600;">Expiry Cutoff:</td>
+          <td style="padding: 5px 0; color: #b45309; font-weight: bold;">${expiryDate}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px 0; color: #78350f; font-weight: 600;">Requisition Date:</td>
+          <td style="padding: 5px 0; color: #0f172a;">${formattedDate} at ${formattedTime}</td>
+        </tr>
+      </table>
+    </div>
+
+    ${params.customMessage ? `
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin: 16px 0; font-size: 13px; color: #334155;">
+      <strong>Direct Administrative Directive:</strong> ${params.customMessage}
+    </div>
+    ` : ''}
+
+    <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; margin: 20px 0;">
+      <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #0f172a;">Protocol Checklist:</h3>
+      <ol style="margin: 0; padding-left: 20px; font-size: 13px; color: #475569; line-height: 1.6;">
+        <li>Prepare the regulatory dossier for <strong>${issuingAuthority}</strong>.</li>
+        <li>Submit statutory renewal fees via authorized government treasury portal.</li>
+        <li>Upload official submission acknowledgment &amp; provisional extension letter to the platform.</li>
+      </ol>
+    </div>
+
+    <p style="font-size: 13px; color: #64748b; margin-bottom: 0;">
+      This automated alert has been logged into the compliance audit trail.
+    </p>
+  </div>
+
+  <div style="background: #f8fafc; padding: 14px 24px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0;">
+    Automated Regulatory Notice dispatched to ${params.complianceOfficerEmail} &bull; &copy; 2026 ${institution}
+  </div>
+</div>
+`.trim();
+
+  const notification: MockEmailNotification = {
+    id: `RENEWAL-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+    to: params.complianceOfficerEmail,
+    recipientName: officerName,
+    subject,
+    bodyText,
+    bodyHtml,
+    type: 'document_renewal_request',
+    sentAt: new Date().toISOString(),
+    status: 'Delivered',
+    metadata: {
+      documentId: params.documentId,
+      documentName: params.documentName,
+      institutionName: institution,
+      expiryDate,
+      issuingAuthority,
+      complianceOfficerEmail: params.complianceOfficerEmail
+    }
+  };
+
+  // Persist to history in localStorage
+  try {
+    const existing = getEmailNotificationHistory();
+    const updated = [notification, ...existing].slice(0, 50);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Failed to save compliance renewal notification to localStorage', err);
+  }
+
+  // Dispatch browser event for real-time UI notification listeners
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('compliance-email-notification-sent', {
+        detail: notification
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent('student-email-notification-sent', {
+        detail: notification
+      })
+    );
+  }
+
+  console.log(`[Email Service] Compliance renewal notification dispatched to ${params.complianceOfficerEmail} (${officerName}):`, notification);
 
   return notification;
 };

@@ -18,7 +18,8 @@ import {
   Compass,
   Settings,
   FileText,
-  Scale
+  Scale,
+  CreditCard
 } from 'lucide-react';
 import { ProfileType } from '../types/education';
 import { PlatformAppMode } from './Header';
@@ -112,6 +113,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     { id: 'dashboard', label: 'Overview Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'profile', label: 'Institution Profile', icon: <Building className="w-4 h-4" /> },
     { id: 'listing_tier', label: 'Listing Plan & Monetization', icon: <Sparkles className="w-4 h-4 text-amber-400" />, subBadge: 'Free/Paid/Tier' },
+    { id: 'payments', label: 'Razorpay Gateway Hub', icon: <CreditCard className="w-4 h-4 text-[#3395ff]" />, subBadge: 'UPI/Cards/EMI' },
     { id: 'academic', label: 'Courses & Programs', icon: <BookOpen className="w-4 h-4" /> },
     { id: 'admissions', label: 'Admissions & Forms', icon: <UserCheck className="w-4 h-4" />, count: pendingApplicationsCount },
     { id: 'specialized', label: specialized.label, icon: specialized.icon, subBadge: specialized.badge },
@@ -163,6 +165,14 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               <div className="flex items-center space-x-2 text-slate-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 <span>SEO Rank &amp; Ad Trackers</span>
+              </div>
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Facebook &amp; Instagram Meta Ads</span>
+              </div>
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                <span>AI Thumbnail Studio (13 Types)</span>
               </div>
               <div className="flex items-center space-x-2 text-slate-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />

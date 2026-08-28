@@ -29,6 +29,8 @@ import { LeadGenerationView } from './LeadGenerationView';
 import { CSVImportExportView } from './CSVImportExportView';
 import { AnalyticsReportingView } from './AnalyticsReportingView';
 import { AdminAuthSecurityView } from './AdminAuthSecurityView';
+import { AIThumbnailPreparationModule } from './AIThumbnailPreparationModule';
+import { MetaAdsAdvertisingModule } from './MetaAdsAdvertisingModule';
 import { CRMLead } from '../../types/crmMarketing';
 
 export type CRMModuleId = 
@@ -38,6 +40,8 @@ export type CRMModuleId =
   | 'crm_sales'
   | 'seo_growth'
   | 'digital_marketing'
+  | 'meta_ads'
+  | 'ai_thumbnails'
   | 'lead_generation'
   | 'csv_import_export'
   | 'analytics'
@@ -45,7 +49,7 @@ export type CRMModuleId =
 
 interface ModuleDef {
   id: CRMModuleId;
-  moduleNumber: number;
+  moduleNumber: number | string;
   title: string;
   shortDesc: string;
   icon: React.ReactNode;
@@ -100,6 +104,22 @@ const MODULES: ModuleDef[] = [
     shortDesc: 'Google/Meta Ads & UTM',
     icon: <Megaphone className="w-4 h-4" />,
     badgeColor: 'bg-pink-950 text-pink-300 border-pink-800'
+  },
+  {
+    id: 'meta_ads',
+    moduleNumber: '6B',
+    title: 'Meta Advertising',
+    shortDesc: 'Facebook & IG Campaigns',
+    icon: <TrendingUp className="w-4 h-4" />,
+    badgeColor: 'bg-blue-950 text-blue-300 border-blue-800'
+  },
+  {
+    id: 'ai_thumbnails',
+    moduleNumber: '6C',
+    title: 'AI Thumbnails',
+    shortDesc: 'Course & Lesson Creatives',
+    icon: <Sparkles className="w-4 h-4" />,
+    badgeColor: 'bg-purple-950 text-purple-300 border-purple-800'
   },
   {
     id: 'lead_generation',
@@ -226,6 +246,8 @@ export const EnterprisePlatformSuite: React.FC = () => {
         {activeModule === 'crm_sales' && <CRMSalesPipelineView />}
         {activeModule === 'seo_growth' && <SEOGrowthView />}
         {activeModule === 'digital_marketing' && <DigitalMarketingView />}
+        {activeModule === 'meta_ads' && <MetaAdsAdvertisingModule />}
+        {activeModule === 'ai_thumbnails' && <AIThumbnailPreparationModule />}
         {activeModule === 'lead_generation' && <LeadGenerationView onLeadCaptured={handleLeadCaptured} />}
         {activeModule === 'csv_import_export' && <CSVImportExportView />}
         {activeModule === 'analytics' && <AnalyticsReportingView />}

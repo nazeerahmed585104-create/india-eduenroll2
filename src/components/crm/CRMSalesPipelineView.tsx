@@ -63,9 +63,11 @@ export const CRMSalesPipelineView: React.FC = () => {
   };
 
   const filteredLeads = leads.filter(l => {
-    const matchesSearch = l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          l.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          l.source.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = !q ||
+                          (l.name || '').toLowerCase().includes(q) ||
+                          (l.email || '').toLowerCase().includes(q) ||
+                          (l.source || '').toLowerCase().includes(q);
     const matchesStage = stageFilter === 'ALL' || l.stage === stageFilter;
     return matchesSearch && matchesStage;
   });

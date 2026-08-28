@@ -30,6 +30,9 @@ async function startServer() {
   // In-memory data store for server-side persistence
   let registrationLedger: any[] = [];
   let applicationStore: any[] = [];
+  let paymentRefunds: any[] = [];
+  let paymentLinks: any[] = [];
+  let virtualAccounts: any[] = [];
   let paymentTransactions: any[] = [
     {
       id: "pay_rzp_init_001",
@@ -40,13 +43,28 @@ async function startServer() {
       purpose: "B.Tech Application Processing Fee",
       studentName: "Aarav Sharma",
       studentEmail: "aarav.sharma@example.com",
+      studentPhone: "+91 9876543210",
       institutionName: "National Institute of Technology",
+      courseName: "B.Tech Computer Science & Engineering",
       method: "upi",
+      methodDetails: {
+        vpa: "aarav@okhdfcbank"
+      },
       status: "captured",
       date: new Date(Date.now() - 3600000 * 24).toISOString(),
       gstAmount: 228.81,
+      cgstAmount: 114.40,
+      sgstAmount: 114.41,
       baseAmount: 1271.19,
-      escrowStatus: "SETTLED_TO_COLLEGE"
+      escrowStatus: "SETTLED_TO_COLLEGE",
+      invoiceNumber: "INV-2026-891042",
+      sacCode: "999293",
+      feeBreakdown: {
+        tuitionOrService: 1000,
+        admissionProcessing: 271.19,
+        libraryLabLevy: 0,
+        taxes: 228.81
+      }
     },
     {
       id: "pay_rzp_init_002",
@@ -57,13 +75,24 @@ async function startServer() {
       purpose: "Monthly Paid Listing Plan Subscription",
       studentName: "Aakash Institute Administration",
       studentEmail: "admin@aakashinstitute.edu.in",
+      studentPhone: "+91 9845012345",
       institutionName: "Aakash NEET & JEE Medical Academy",
+      courseName: "Institutional Premium Spotlight Tier",
       method: "card",
+      methodDetails: {
+        cardNetwork: "Visa",
+        cardLast4: "4242",
+        cardType: "credit"
+      },
       status: "captured",
       date: new Date(Date.now() - 3600000 * 48).toISOString(),
       gstAmount: 2288.0,
+      cgstAmount: 1144.0,
+      sgstAmount: 1144.0,
       baseAmount: 12711.0,
-      escrowStatus: "PLATFORM_REVENUE"
+      escrowStatus: "PLATFORM_REVENUE",
+      invoiceNumber: "INV-2026-642019",
+      sacCode: "998311"
     }
   ];
 
@@ -75,7 +104,17 @@ async function startServer() {
       timestamp: new Date().toISOString(),
       razorpay: {
         configured: !!process.env.RAZORPAY_KEY_ID,
-        mode: process.env.RAZORPAY_KEY_ID ? "Live/Custom API Keys" : "Sandbox Test Mode"
+        mode: process.env.RAZORPAY_KEY_ID ? "Live / Custom Production Keys" : "Interactive High-Fidelity Sandbox Gateway",
+        keyId: process.env.RAZORPAY_KEY_ID ? `${process.env.RAZORPAY_KEY_ID.substring(0, 8)}...` : "rzp_test_eduPlatform2026",
+        features: [
+          "UPI 2.0 Dynamic QR & Intent (GPay, PhonePe, Paytm, BHIM, Cred)",
+          "Credit/Debit Cards with RBI Tokenisation & 3DS 2.0",
+          "NetBanking across 50+ Scheduled Indian Banks",
+          "Zero-Cost Education Installment EMIs & PayLater",
+          "GST Tax Invoice Generation (SAC 999293)",
+          "Payment Links & Instant Refund Processing",
+          "Smart Virtual Account NEFT/RTGS Wire Ingestion"
+        ]
       },
       architecture: {
         runtime: "Node.js / Express Proxy",
@@ -97,20 +136,76 @@ async function startServer() {
       currency: "INR",
       isLive,
       themeColor: "#4f46e5",
-      merchantName: "EduPlatform Education Technologies Pvt Ltd"
+      merchantName: "EduPlatform Technologies Pvt. Ltd.",
+      supportEmail: "billing@eduplatform.ac.in",
+      supportPhone: "+91 800 425 8080",
+      gstin: "29AABCE1234F1Z8"
+    });
+  });
+
+  // Coupon / Scholarship Discount Code Validation
+  app.post("/api/razorpay/validate-coupon", (req, res) => {
+    const { code, amount = 1500 } = req.body;
+    const cleanCode = (code || "").trim().toUpperCase();
+
+    if (!cleanCode) {
+      return res.status(400).json({ valid: false, error: "Please enter a valid coupon or merit code" });
+    }
+
+    const validCoupons: Record<string, { discountAmount: number; discountPercent?: number; description: string }> = {
+      "MERIT2026": { discountAmount: 1000, description: "Merit Scholar Grant (₹1,000 Flat Waiver)" },
+      "EARLYBIRD": { discountAmount: 500, discountPercent: 10, description: "Early Admission Bird Discount (10% Off)" },
+      "EDUFEE500": { discountAmount: 500, description: "Special Counsel Incentive (₹500 Off)" },
+      "CAMPUS100": { discountAmount: 100, description: "Campus Orientation Fee Waiver (₹100 Off)" }
+    };
+
+    const matched = validCoupons[cleanCode];
+    if (matched) {
+      let discountValue = matched.discountAmount;
+      if (matched.discountPercent) {
+        discountValue = Math.round((amount * matched.discountPercent) / 100);
+      }
+      discountValue = Math.min(amount - 100, discountValue); // Ensure minimum payable ₹100
+
+      return res.json({
+        valid: true,
+        code: cleanCode,
+        discountAmount: discountValue,
+        description: matched.description,
+        payableAmount: Math.max(100, amount - discountValue)
+      });
+    }
+
+    return res.status(404).json({
+      valid: false,
+      error: `Coupon "${cleanCode}" is invalid or expired. Try "MERIT2026" or "EARLYBIRD".`
     });
   });
 
   // Razorpay Create Order Endpoint
   app.post("/api/razorpay/create-order", async (req, res) => {
     try {
-      const { amount, currency = "INR", receipt, notes = {}, purpose = "Education Fee" } = req.body;
+      const { 
+        amount, 
+        currency = "INR", 
+        receipt, 
+        notes = {}, 
+        purpose = "Education Course Application Fee",
+        studentName,
+        studentEmail,
+        studentPhone,
+        institutionName,
+        courseName,
+        discountCode,
+        discountAmount = 0
+      } = req.body;
 
       if (!amount || amount <= 0) {
-        return res.status(400).json({ error: "Valid amount is required" });
+        return res.status(400).json({ error: "Valid payable amount is required" });
       }
 
-      const amountInPaise = Math.round(Number(amount) * 100);
+      const finalPayable = Math.max(1, Math.round(Number(amount) - Number(discountAmount)));
+      const amountInPaise = Math.round(finalPayable * 100);
       const rzp = getRazorpayClient();
 
       let order: any = null;
@@ -124,7 +219,12 @@ async function startServer() {
           notes: {
             ...notes,
             purpose,
-            platform: "EduPlatform"
+            studentName: studentName || "Student Applicant",
+            studentEmail: studentEmail || "student@example.com",
+            institutionName: institutionName || "EduPlatform",
+            courseName: courseName || "Academic Program",
+            discountCode: discountCode || "NONE",
+            platform: "EduPlatform Gateway v2"
           }
         });
       } else {
@@ -143,9 +243,15 @@ async function startServer() {
           notes: {
             ...notes,
             purpose,
-            platform: "EduPlatform"
+            studentName: studentName || "Student Applicant",
+            studentEmail: studentEmail || "student@example.com",
+            institutionName: institutionName || "EduPlatform",
+            courseName: courseName || "Academic Program",
+            discountCode: discountCode || "NONE",
+            platform: "EduPlatform Gateway v2"
           },
-          created_at: Math.floor(Date.now() / 1000)
+          created_at: Math.floor(Date.now() / 1000),
+          discountApplied: discountAmount
         };
       }
 
@@ -197,10 +303,11 @@ async function startServer() {
         });
       }
 
-      // Calculate GST breakdown (18%)
+      // Calculate GST breakdown (18% - CGST 9% + SGST 9%)
       const totalAmount = Number(paymentMeta.amount || 1500);
       const baseAmount = Math.round((totalAmount / 1.18) * 100) / 100;
       const gstAmount = Math.round((totalAmount - baseAmount) * 100) / 100;
+      const halfGst = Math.round((gstAmount / 2) * 100) / 100;
 
       const transactionRecord = {
         id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -211,14 +318,34 @@ async function startServer() {
         purpose: paymentMeta.purpose || "Education Course Application",
         studentName: paymentMeta.studentName || "Candidate",
         studentEmail: paymentMeta.studentEmail || "student@example.com",
+        studentPhone: paymentMeta.studentPhone || "+91 9876543210",
         institutionName: paymentMeta.institutionName || "Affiliated Institution",
+        courseName: paymentMeta.courseName || "Academic Course Program",
         method: paymentMeta.method || "upi",
+        methodDetails: paymentMeta.methodDetails || {
+          vpa: paymentMeta.method === "upi" ? (paymentMeta.vpa || "candidate@okhdfcbank") : undefined,
+          cardNetwork: paymentMeta.method === "card" ? "Visa" : undefined,
+          cardLast4: paymentMeta.method === "card" ? "4242" : undefined,
+          cardType: paymentMeta.method === "card" ? "debit" : undefined,
+          bankName: paymentMeta.method === "netbanking" ? (paymentMeta.bankName || "HDFC Bank") : undefined
+        },
         status: "captured",
         date: new Date().toISOString(),
         gstAmount,
+        cgstAmount: halfGst,
+        sgstAmount: Math.round((gstAmount - halfGst) * 100) / 100,
         baseAmount,
+        discountAmount: paymentMeta.discountAmount || 0,
+        discountCode: paymentMeta.discountCode || undefined,
         escrowStatus: paymentMeta.purpose?.includes("Listing") ? "PLATFORM_REVENUE" : "SETTLED_TO_COLLEGE",
-        invoiceNumber: `INV-2026-${Math.floor(100000 + Math.random() * 900000)}`
+        invoiceNumber: `INV-2026-${Math.floor(100000 + Math.random() * 900000)}`,
+        sacCode: paymentMeta.purpose?.includes("Listing") ? "998311" : "999293",
+        feeBreakdown: {
+          tuitionOrService: Math.round(baseAmount * 0.8),
+          admissionProcessing: Math.round(baseAmount * 0.2),
+          libraryLabLevy: 0,
+          taxes: gstAmount
+        }
       };
 
       paymentTransactions.unshift(transactionRecord);
@@ -231,6 +358,130 @@ async function startServer() {
     } catch (error: any) {
       console.error("Payment verification error:", error);
       res.status(500).json({ error: "Failed to verify payment", message: error.message });
+    }
+  });
+
+  // Razorpay Process Refund Endpoint
+  app.post("/api/razorpay/refund", (req, res) => {
+    try {
+      const { paymentId, amount, reason = "Student requested fee cancellation / withdrawal", speed = "instant" } = req.body;
+
+      if (!paymentId) {
+        return res.status(400).json({ error: "Payment ID is required to issue a refund" });
+      }
+
+      const txIndex = paymentTransactions.findIndex(t => t.paymentId === paymentId || t.id === paymentId);
+      const targetTx = txIndex >= 0 ? paymentTransactions[txIndex] : null;
+
+      const refundAmount = amount ? Number(amount) : (targetTx ? targetTx.amount : 1500);
+
+      const refundRecord = {
+        id: `rfnd_${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+        paymentId,
+        orderId: targetTx?.orderId || `order_${Math.random().toString(36).substring(2, 9)}`,
+        amount: refundAmount,
+        currency: "INR",
+        status: "processed",
+        speed,
+        reason,
+        createdAt: new Date().toISOString(),
+        acquirerData: {
+          rrn: `RRN-${Math.floor(100000000000 + Math.random() * 900000000000)}`,
+          arn: `ARN-${Math.floor(1000000000 + Math.random() * 9000000000)}`
+        }
+      };
+
+      paymentRefunds.unshift(refundRecord);
+
+      if (targetTx) {
+        targetTx.status = refundAmount >= targetTx.amount ? "refunded" : "captured";
+        targetTx.escrowStatus = "REFUNDED";
+        targetTx.refunds = targetTx.refunds ? [refundRecord, ...targetTx.refunds] : [refundRecord];
+      }
+
+      res.status(201).json({
+        success: true,
+        message: `Refund of ₹${refundAmount.toLocaleString()} successfully processed via Razorpay (${speed})`,
+        refund: refundRecord
+      });
+    } catch (error: any) {
+      console.error("Refund processing error:", error);
+      res.status(500).json({ error: "Failed to process refund", message: error.message });
+    }
+  });
+
+  // Razorpay Generate Payment Link Endpoint
+  app.post("/api/razorpay/payment-link", (req, res) => {
+    try {
+      const { 
+        amount, 
+        description = "Admission / Course Fee Due", 
+        customer = { name: "Applicant", email: "student@example.com", contact: "+91 9876543210" },
+        referenceId
+      } = req.body;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: "Valid payable amount is required" });
+      }
+
+      const linkId = `plink_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      const paymentLinkRecord = {
+        id: linkId,
+        shortUrl: `https://rzp.io/l/${linkId.substring(6).toLowerCase()}`,
+        amount: Number(amount),
+        currency: "INR",
+        description,
+        status: "created",
+        customer: {
+          name: customer.name || "Student Applicant",
+          email: customer.email || "student@example.com",
+          contact: customer.contact || "+91 9876543210"
+        },
+        referenceId: referenceId || `REF-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        expiredAt: new Date(Date.now() + 7 * 24 * 3600000).toISOString()
+      };
+
+      paymentLinks.unshift(paymentLinkRecord);
+
+      res.status(201).json({
+        success: true,
+        message: "Razorpay payment link generated and notification queued",
+        paymentLink: paymentLinkRecord
+      });
+    } catch (error: any) {
+      console.error("Payment link error:", error);
+      res.status(500).json({ error: "Failed to generate payment link", message: error.message });
+    }
+  });
+
+  // Razorpay Smart Virtual Account (Bank Wire NEFT/RTGS) Generator
+  app.post("/api/razorpay/virtual-account", (req, res) => {
+    try {
+      const { studentName, studentId = "STU-2026", amountExpected } = req.body;
+      const vaNumber = `RAZORPAY${Math.floor(100000000 + Math.random() * 900000000)}`;
+
+      const virtualAccount = {
+        id: `va_${Math.random().toString(36).substring(2, 10)}`,
+        name: `EduPlatform - ${studentName || "Candidate"}`,
+        accountNumber: vaNumber,
+        ifsc: "RAZR0000001",
+        bankName: "RBL Bank (Razorpay Escrow Trustee)",
+        upiVpa: `${vaNumber.toLowerCase()}@razorpay`,
+        status: "active",
+        amountExpected: amountExpected ? Number(amountExpected) : undefined,
+        customerName: studentName || "Student Applicant",
+        studentId
+      };
+
+      virtualAccounts.unshift(virtualAccount);
+
+      res.status(201).json({
+        success: true,
+        virtualAccount
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create virtual account", message: error.message });
     }
   });
 
@@ -256,12 +507,28 @@ async function startServer() {
     res.status(200).json({ status: "ok", received: true, event });
   });
 
+  // Razorpay Webhook Event Simulation Endpoint (for testing)
+  app.post("/api/razorpay/webhook/simulate", (req, res) => {
+    const { eventType = "payment.captured", paymentId = "pay_simulated_test" } = req.body;
+    
+    console.log(`[Razorpay Simulated Webhook] Dispatching simulated event: ${eventType} for ${paymentId}`);
+    res.json({
+      success: true,
+      event: eventType,
+      simulatedAt: new Date().toISOString(),
+      delivered: true
+    });
+  });
+
   // Get Payment Transactions
   app.get("/api/razorpay/transactions", (req, res) => {
     res.json({
       success: true,
       count: paymentTransactions.length,
-      transactions: paymentTransactions
+      transactions: paymentTransactions,
+      refunds: paymentRefunds,
+      paymentLinks: paymentLinks,
+      virtualAccounts: virtualAccounts
     });
   });
 

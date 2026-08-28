@@ -407,3 +407,146 @@ export interface AdminActivityLog {
   ipAddress: string;
   status: 'SUCCESS' | 'BLOCKED' | 'FLAGGED';
 }
+
+// ==========================================
+// 13. AI Thumbnail Preparation Module Types
+// ==========================================
+export type EducationThumbnailType =
+  | 'course'
+  | 'subject'
+  | 'chapter'
+  | 'lesson'
+  | 'live_class'
+  | 'batch'
+  | 'exam_mock_test'
+  | 'webinar'
+  | 'teacher_faculty'
+  | 'residential_school'
+  | 'jee_neet_cet_upsc'
+  | 'university_college'
+  | 'promotional';
+
+export type ThumbnailAspectRatio = '16:9' | '1:1' | '9:16' | '4:3';
+
+export type ThumbnailVisualTheme = 
+  | 'Cinematic 3D Glow' 
+  | 'Clean Minimalist Flat' 
+  | 'Dark Futuristic Neon' 
+  | 'Academic Blueprint' 
+  | 'High-Contrast Geometric' 
+  | 'Vibrant Gradients';
+
+export type ThumbnailLayout = 'Split Card' | 'Center Hero' | 'Badge & Formula Banner' | 'Grid Multi-Highlight';
+
+export interface ThumbnailTemplateItem {
+  id: string;
+  name: string;
+  category: 'Mathematics' | 'Physics' | 'Chemistry' | 'Biology' | 'Competitive Exams' | 'School' | 'Professional IT';
+  subjectOrExam: string;
+  visualKeywords: string[];
+  recommendedColors: { bgGradient: string; textAccent: string; badgeBg: string };
+  badgeText: string;
+  defaultTitle: string;
+  defaultSubtitle: string;
+  iconName: string;
+}
+
+export interface AIThumbnailRecord {
+  id: string;
+  title: string;
+  subtitle: string;
+  thumbnailType: EducationThumbnailType;
+  category: string;
+  classOrGrade: string;
+  subject: string;
+  exam: string;
+  visualStyle: ThumbnailVisualTheme;
+  layout: ThumbnailLayout;
+  aspectRatio: ThumbnailAspectRatio;
+  themeColors: { bgGradient: string; textAccent: string; badgeBg: string };
+  iconName: string;
+  generatedPrompt: string;
+  readabilityScore: number; // 0 - 100
+  mobileOptimized: boolean;
+  approvalStatus: 'DRAFT' | 'REVIEW_PENDING' | 'APPROVED' | 'PUBLISHED';
+  publishedToCdnUrl?: string;
+  createdAt: string;
+  variationsCount: number;
+}
+
+// ==========================================
+// 14. Facebook & Instagram Advertising Types
+// ==========================================
+export type MetaCampaignObjective = 
+  | 'LEAD_GENERATION' 
+  | 'WEBSITE_TRAFFIC' 
+  | 'COURSE_ENROLLMENT' 
+  | 'ADMISSION_APPLICATIONS' 
+  | 'BRAND_AWARENESS' 
+  | 'REMARKETING';
+
+export type MetaAdPlatform = 'Facebook Feed' | 'Instagram Feed' | 'Instagram Stories / Reels' | 'Messenger' | 'Audience Network';
+
+export interface MetaAdCampaignItem {
+  id: string;
+  name: string;
+  objective: MetaCampaignObjective;
+  status: 'ACTIVE' | 'PAUSED' | 'IN_REVIEW' | 'COMPLETED';
+  platforms: MetaAdPlatform[];
+  dailyBudget: number;
+  lifetimeBudget?: number;
+  startDate: string;
+  endDate?: string;
+  
+  // Targeting
+  targetLocations: string[];
+  ageMin: number;
+  ageMax: number;
+  educationInterests: string[];
+  courseInterests: string[];
+  examInterests: string[];
+  audienceType: 'Broad' | 'Custom Audience' | 'Lookalike 1%' | 'Pixel Retargeting';
+  
+  // Creative
+  headline: string;
+  primaryText: string;
+  description: string;
+  callToAction: 'Apply Now' | 'Book Free Demo' | 'Get Syllabus' | 'Learn More' | 'Download Prospectus';
+  landingPageUrl: string;
+  thumbnailUrl: string;
+  
+  // Performance
+  impressions: number;
+  reach: number;
+  clicks: number;
+  ctr: number;
+  videoViews: number;
+  leadsGenerated: number;
+  costPerLead: number;
+  applicationsSubmitted: number;
+  admissionsEnrolled: number;
+  adSpend: number;
+  revenueAttributed: number;
+  roas: number;
+}
+
+export interface MetaLeadFormSubmission {
+  id: string;
+  campaignId: string;
+  campaignName: string;
+  platform: 'Facebook' | 'Instagram';
+  studentName: string;
+  parentName: string;
+  phone: string;
+  email: string;
+  classGrade: string;
+  targetCourse: string;
+  preferredInstitution: string;
+  examInterest: string;
+  submittedAt: string;
+  syncStatus: 'SYNCED_TO_CRM' | 'DUPLICATE_FLAGGED' | 'ALLOCATED_TO_TELESALES';
+  assignedCounselor: string;
+  leadScore: number;
+  admissionStatus: 'New Lead' | 'In Counselling' | 'Application Submitted' | 'Fee Paid (Enrolled)';
+}
+

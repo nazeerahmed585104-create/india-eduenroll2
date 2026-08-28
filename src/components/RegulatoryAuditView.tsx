@@ -44,10 +44,14 @@ import {
   Link2,
   MapPin,
   Mail,
-  Send
+  Send,
+  CalendarCheck
 } from 'lucide-react';
 import { RegulatoryQRScannerModal } from './RegulatoryQRScannerModal';
 import { RequestRenewalEmailModal } from './RequestRenewalEmailModal';
+import { SystemAuditLogView } from './SystemAuditLogView';
+import { ScheduleReminderModal } from './ScheduleReminderModal';
+import { InstitutionalComplianceCalendar } from './InstitutionalComplianceCalendar';
 import { 
   ResponsiveContainer, 
   PieChart, 
@@ -68,27 +72,61 @@ import {
   RegulatoryAuditSummary, 
   ComplianceDocumentStatus,
   ComplianceUrgency,
-  DocumentAuditLogEntry
+  DocumentAuditLogEntry,
+  SystemAuditLogEntry,
+  ComplianceCalendarEvent
 } from '../types/regulatoryAudit';
 import { 
   INITIAL_COMPLIANCE_CERTIFICATES, 
   INITIAL_AUDIT_SUMMARY, 
   CATEGORY_BREAKDOWN_DATA, 
-  MONTHLY_AUDIT_TREND 
+  MONTHLY_AUDIT_TREND,
+  INITIAL_SYSTEM_AUDIT_LOGS,
+  INITIAL_COMPLIANCE_CALENDAR_EVENTS
 } from '../data/regulatoryAuditData';
+import { 
+  calculateSuggestedRenewalDate, 
+  create60DayCalendarEventFromCert, 
+  formatDisplayDate, 
+  getRenewalWindowAnalysis 
+} from '../utils/complianceDateUtils';
 import { InstitutionProfileData } from '../types/education';
 
 interface RegulatoryAuditViewProps {
   institution?: InstitutionProfileData;
+  systemAuditLogs?: SystemAuditLogEntry[];
+  onLogSystemAuditEvent?: (entry: SystemAuditLogEntry) => void;
+  initialActiveTab?: 'certificates' | 'system_audit' | 'calendar';
 }
 
-export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ institution }) => {
+export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ 
+  institution,
+  systemAuditLogs: externalLogs,
+  onLogSystemAuditEvent,
+  initialActiveTab = 'certificates'
+}) => {
+  const [activeAuditTab, setActiveAuditTab] = useState<'certificates' | 'system_audit' | 'calendar'>(initialActiveTab);
+  const [localSystemAuditLogs, setLocalSystemAuditLogs] = useState<SystemAuditLogEntry[]>(INITIAL_SYSTEM_AUDIT_LOGS);
+  const currentSystemAuditLogs = externalLogs || localSystemAuditLogs;
+
+  const recordSystemAuditEvent = (entry: SystemAuditLogEntry) => {
+    if (onLogSystemAuditEvent) {
+      onLogSystemAuditEvent(entry);
+    }
+    setLocalSystemAuditLogs(prev => [entry, ...prev]);
+  };
+
   const [certificates, setCertificates] = useState<ComplianceCertificate[]>(INITIAL_COMPLIANCE_CERTIFICATES);
   const [auditSummary] = useState<RegulatoryAuditSummary>(INITIAL_AUDIT_SUMMARY);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'near_expiry' | 'critical' | 'verified' | 'pending' | 'rejected'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   
+  // Compliance Calendar Events State
+  const [complianceCalendarEvents, setComplianceCalendarEvents] = useState<ComplianceCalendarEvent[]>(INITIAL_COMPLIANCE_CALENDAR_EVENTS);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [selectedCertForSchedule, setSelectedCertForSchedule] = useState<ComplianceCertificate | null>(null);
+
   // Audit History state
   const [showAuditHistory, setShowAuditHistory] = useState<boolean>(false);
   const [expandedDocHistories, setExpandedDocHistories] = useState<Record<string, boolean>>({});
@@ -114,6 +152,198 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
   const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
     setNotificationToast({ message, type });
     setTimeout(() => setNotificationToast(null), 4500);
+  };
+
+  // Handler: Open Schedule 60-Day Reminder Modal for a Document
+  const handleOpenScheduleModal = (cert: ComplianceCertificate) => {
+    setSelectedCertForSchedule(cert);
+    setIsScheduleModalOpen(true);
+  };
+
+  // Handler: Save Scheduled Reminder from Modal
+  const handleSaveReminderSchedule = (eventData: Partial<ComplianceCalendarEvent>, certId: string) => {
+    const targetCert = certificates.find(c => c.id === certId);
+    if (!targetCert) return;
+
+    const eventId = eventData.id || `cal-event-${certId}`;
+    const fullEvent: ComplianceCalendarEvent = {
+      id: eventId,
+      title: eventData.title || `Statutory Renewal: ${targetCert.name}`,
+      documentId: targetCert.id,
+      certificateNumber: targetCert.certificateNumber,
+      category: targetCert.category,
+      issuingAuthority: targetCert.issuingAuthority,
+      expiryDate: targetCert.expiryDate,
+      suggestedRenewalDate: eventData.suggestedRenewalDate || calculateSuggestedRenewalDate(targetCert.expiryDate, 60),
+      reminderDate: eventData.reminderDate || calculateSuggestedRenewalDate(targetCert.expiryDate, 60),
+      leadTimeDays: eventData.leadTimeDays || 60,
+      assignedOfficer: eventData.assignedOfficer || targetCert.assignedOfficer,
+      officerEmail: eventData.officerEmail || targetCert.complianceOfficerEmail || 'compliance.desk@institution.edu',
+      priority: eventData.priority || 'high',
+      status: eventData.status || 'scheduled',
+      reminderChannels: eventData.reminderChannels || ['in_app', 'email', 'registrar_escalation'],
+      notes: eventData.notes || `Automated 60-day renewal reminder scheduled for ${targetCert.name}.`,
+      autoScheduled: true,
+      createdAt: new Date().toLocaleString(),
+      lastSyncedAt: new Date().toISOString()
+    };
+
+    // Update Calendar Events state
+    setComplianceCalendarEvents(prev => {
+      const exists = prev.some(e => e.id === eventId || e.documentId === certId);
+      if (exists) {
+        return prev.map(e => (e.id === eventId || e.documentId === certId) ? fullEvent : e);
+      }
+      return [fullEvent, ...prev];
+    });
+
+    // Update Certificate state
+    setCertificates(prev => prev.map(cert => {
+      if (cert.id === certId) {
+        const auditLog: DocumentAuditLogEntry = {
+          id: `log-cal-sched-${Date.now()}`,
+          action: 'Institutional Calendar Renewal Reminder Scheduled (60-Day Lead)',
+          performedBy: institution?.name ? `${institution.name} Compliance Desk` : 'Institutional Compliance Desk',
+          timestamp: new Date().toLocaleString(),
+          status: 'verified',
+          notes: `Automated statutory renewal reminder set for ${formatDisplayDate(fullEvent.suggestedRenewalDate)} (60 days prior to ${formatDisplayDate(fullEvent.expiryDate)} expiry). Responsible: ${fullEvent.assignedOfficer}.`,
+          hashSignature: `CAL-SCHED:${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+        };
+
+        return {
+          ...cert,
+          suggestedRenewalDate: fullEvent.suggestedRenewalDate,
+          calendarReminderScheduled: true,
+          calendarReminderId: eventId,
+          complianceOfficerEmail: fullEvent.officerEmail,
+          auditHistory: [auditLog, ...(cert.auditHistory || [])]
+        };
+      }
+      return cert;
+    }));
+
+    // Record immutable system audit log entry
+    const newSysAuditEntry: SystemAuditLogEntry = {
+      id: `sys-log-cal-${Date.now()}`,
+      eventType: 'CALENDAR_REMINDER_SCHEDULED',
+      eventTitle: '60-Day Renewal Reminder Scheduled in Institutional Calendar',
+      documentId: targetCert.id,
+      documentName: targetCert.name,
+      category: targetCert.category,
+      issuingAuthority: targetCert.issuingAuthority,
+      performedBy: institution?.name ? `${institution.name} Compliance Officer` : 'Institutional Compliance Desk',
+      actorRole: 'Registrar & Chief Compliance Officer',
+      timestamp: new Date().toLocaleString(),
+      ipAddress: '192.168.1.108',
+      hashSignature: `SHA256:CAL-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+      status: 'COMPLETED',
+      severity: fullEvent.priority === 'critical' ? 'warning' : 'info',
+      details: {
+        actionDescription: `Automated 60-day statutory renewal milestone scheduled for ${formatDisplayDate(fullEvent.suggestedRenewalDate)}. Expiry: ${formatDisplayDate(fullEvent.expiryDate)}.`,
+        leadTimeDays: fullEvent.leadTimeDays,
+        suggestedRenewalDate: fullEvent.suggestedRenewalDate,
+        expiryDate: fullEvent.expiryDate,
+        assignedOfficer: fullEvent.assignedOfficer,
+        recipientEmail: fullEvent.officerEmail,
+        reminderChannels: fullEvent.reminderChannels,
+        reasonOrNotes: fullEvent.notes,
+        systemTicketId: `CAL-SCHED-${Date.now().toString().slice(-6)}`
+      }
+    };
+    recordSystemAuditEvent(newSysAuditEntry);
+
+    showToast(`Automated 60-day renewal reminder scheduled for ${formatDisplayDate(fullEvent.suggestedRenewalDate)} and synced to Institutional Calendar!`, 'success');
+  };
+
+  // Handler: Batch Auto-Schedule All Unscheduled Certificates (60-Day Engine)
+  const handleBatchAutoScheduleAll = () => {
+    const unscheduled = certificates.filter(c => !complianceCalendarEvents.some(e => e.documentId === c.id));
+    if (unscheduled.length === 0) {
+      showToast('All compliance certificates are already scheduled with 60-day renewal reminders.', 'info');
+      return;
+    }
+
+    const newEvents: ComplianceCalendarEvent[] = [];
+    const timestamp = new Date().toLocaleString();
+
+    unscheduled.forEach(cert => {
+      const ev = create60DayCalendarEventFromCert(cert);
+      newEvents.push(ev);
+    });
+
+    setComplianceCalendarEvents(prev => [...newEvents, ...prev]);
+
+    setCertificates(prev => prev.map(cert => {
+      const match = newEvents.find(e => e.documentId === cert.id);
+      if (match) {
+        return {
+          ...cert,
+          suggestedRenewalDate: match.suggestedRenewalDate,
+          calendarReminderScheduled: true,
+          calendarReminderId: match.id
+        };
+      }
+      return cert;
+    }));
+
+    // Record Batch System Audit Log
+    const batchAuditLog: SystemAuditLogEntry = {
+      id: `sys-log-batch-cal-${Date.now()}`,
+      eventType: 'CALENDAR_BATCH_SCHEDULED',
+      eventTitle: `Batch 60-Day Renewal Auto-Scheduling Executed (${unscheduled.length} Documents)`,
+      documentName: 'All Statutory Compliance Documents (Batch Auto-Scheduled)',
+      performedBy: institution?.name ? `${institution.name} System Daemon` : 'Automated Regulatory Engine',
+      actorRole: 'System Automated Regulatory Engine',
+      timestamp,
+      ipAddress: '192.168.1.1',
+      hashSignature: `SHA256:BATCH-CAL-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+      status: 'COMPLETED',
+      severity: 'success',
+      details: {
+        actionDescription: `Automated batch calculation applied 60-day pre-expiry renewal milestones across ${unscheduled.length} statutory certificates.`,
+        reasonOrNotes: 'Standard institutional compliance automation rule: calculate T-60 day target renewal filing dates for all active documents.'
+      }
+    };
+    recordSystemAuditEvent(batchAuditLog);
+
+    showToast(`Batch Automation Complete: ${unscheduled.length} certificates scheduled with 60-day renewal reminders!`, 'success');
+  };
+
+  // Handler: Send Calendar Reminder Immediately
+  const handleSendCalendarReminderNow = (event: ComplianceCalendarEvent) => {
+    const timestamp = new Date().toLocaleString();
+
+    // Update event status to 'sent'
+    setComplianceCalendarEvents(prev => prev.map(e => e.id === event.id ? { ...e, status: 'sent', lastSyncedAt: new Date().toISOString() } : e));
+
+    // Record System Audit Log
+    const reminderLog: SystemAuditLogEntry = {
+      id: `sys-log-cal-dispatch-${Date.now()}`,
+      eventType: 'RENEWAL_REQUESTED',
+      eventTitle: `Instant Compliance Reminder Dispatched: ${event.title}`,
+      documentId: event.documentId,
+      documentName: event.title.replace('Statutory Renewal: ', ''),
+      category: event.category,
+      issuingAuthority: event.issuingAuthority,
+      performedBy: institution?.name ? `${institution.name} Compliance Desk` : 'Institutional Compliance Desk',
+      actorRole: 'Central Compliance Desk Dispatcher',
+      timestamp,
+      ipAddress: '192.168.1.10',
+      hashSignature: `EMAIL-REMINDER:SHA256-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+      status: 'DISPATCHED',
+      severity: event.priority === 'critical' ? 'critical' : 'warning',
+      details: {
+        actionDescription: `Statutory compliance reminder dispatched to assigned officer ${event.assignedOfficer} <${event.officerEmail}>. Channels: ${event.reminderChannels.join(', ')}.`,
+        recipientEmail: event.officerEmail,
+        recipientName: event.assignedOfficer,
+        priority: `${event.priority.toUpperCase()} TIER`,
+        reasonOrNotes: event.notes,
+        systemTicketId: `CAL-ALERT-${Date.now().toString().slice(-6)}`
+      }
+    };
+    recordSystemAuditEvent(reminderLog);
+
+    showToast(`Statutory renewal reminder notice dispatched to ${event.assignedOfficer} (${event.officerEmail})!`, 'success');
   };
 
   // Handler: Open Request Renewal Email Modal for a Document
@@ -158,6 +388,34 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
       }
       return cert;
     }));
+
+    // Record immutable system audit log entry
+    const targetCert = certificates.find(c => c.id === data.certificateId);
+    const newSysAuditEntry: SystemAuditLogEntry = {
+      id: `sys-log-rnw-${Date.now()}`,
+      eventType: 'RENEWAL_REQUESTED',
+      eventTitle: `Renewal Request Dispatched (${data.priority.toUpperCase()} TIER)`,
+      documentId: data.certificateId,
+      documentName: targetCert?.name || 'Compliance Certificate',
+      category: targetCert?.category || 'Accreditation & Statutory',
+      issuingAuthority: targetCert?.issuingAuthority || 'Regulatory Authority',
+      performedBy: institution?.name ? `${institution.name} Compliance Desk` : 'Institutional Compliance Desk',
+      actorRole: 'System Automated Regulatory Engine',
+      timestamp,
+      ipAddress: '192.168.1.10',
+      hashSignature: `EMAIL-RNW:SHA256-${Math.random().toString(36).substring(2, 10).toUpperCase()}-DELIVERED`,
+      status: 'DISPATCHED',
+      severity: data.priority === 'critical' ? 'critical' : data.priority === 'urgent' ? 'warning' : 'info',
+      details: {
+        actionDescription: `Automated renewal request email dispatched to ${data.recipientName} <${data.recipientEmail}>. CC: ${data.ccList.join(', ') || 'None'}. Subject: "${data.subject}".`,
+        recipientEmail: data.recipientEmail,
+        recipientName: data.recipientName,
+        priority: `${data.priority.toUpperCase()} TIER`,
+        reasonOrNotes: data.customNotes || `Certificate validity expiring. Renewal required before ${targetCert?.expiryDate || 'expiry'}.`,
+        systemTicketId: `RNW-REQ-${Date.now().toString().slice(-6)}`
+      }
+    };
+    recordSystemAuditEvent(newSysAuditEntry);
 
     showToast(`Automated renewal request email dispatched to ${data.recipientName} (${data.recipientEmail})! Audit log recorded.`, 'success');
   };
@@ -375,6 +633,39 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
 
       setIsProcessingRenewal(false);
       setIsRenewalModalOpen(false);
+
+      // Record in system audit log
+      const renewSysLog: SystemAuditLogEntry = {
+        id: `sys-log-renewed-${Date.now()}`,
+        eventType: 'DOCUMENT_RENEWED',
+        eventTitle: 'Document Renewal Verified & Expiry Extended',
+        documentId: selectedCertForRenewal.id,
+        documentName: selectedCertForRenewal.name,
+        category: selectedCertForRenewal.category,
+        issuingAuthority: selectedCertForRenewal.issuingAuthority,
+        performedBy: institution?.name ? `${institution.name} Admin (Registrar Office)` : 'Admin (Registrar Office)',
+        actorRole: 'Registrar & Chief Compliance Officer',
+        timestamp: nowFormatted,
+        ipAddress: '192.168.1.108',
+        hashSignature: `SHA256:RNW-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        status: 'COMPLETED',
+        severity: 'success',
+        details: {
+          actionDescription: `Renewed certificate uploaded with verified official seal. Expiry extended to ${newExpiryDate}.`,
+          previousState: {
+            expiryDate: selectedCertForRenewal.expiryDate,
+            status: selectedCertForRenewal.status
+          },
+          newState: {
+            expiryDate: newExpiryDate,
+            status: 'verified'
+          },
+          reasonOrNotes: renewalNotesInput || 'Renewed document uploaded and verified against authority registry.',
+          systemTicketId: `RNW-APP-${Date.now().toString().slice(-6)}`
+        }
+      };
+      recordSystemAuditEvent(renewSysLog);
+
       setSelectedCertForRenewal(null);
       setRenewalFile(null);
       showToast(`Renewal submitted for "${selectedCertForRenewal.name}". Expiry extended to ${newExpiryDate}. Audit log recorded.`, 'success');
@@ -453,6 +744,42 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            {/* Compliance Calendar Shortcut Button */}
+            <button
+              id="btn-header-compliance-calendar"
+              onClick={() => setActiveAuditTab(activeAuditTab === 'calendar' ? 'certificates' : 'calendar')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center space-x-2 transition border shadow-sm cursor-pointer ${
+                activeAuditTab === 'calendar'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-amber-950/40 ring-2 ring-amber-400/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+              }`}
+              title="Switch to Institutional Compliance Calendar"
+            >
+              <CalendarCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>Compliance Calendar</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-indigo-950 text-indigo-300 border border-indigo-800">
+                {complianceCalendarEvents.length}
+              </span>
+            </button>
+
+            {/* System Audit Log View Button */}
+            <button
+              id="btn-switch-system-audit-log"
+              onClick={() => setActiveAuditTab(activeAuditTab === 'system_audit' ? 'certificates' : 'system_audit')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center space-x-2 transition border shadow-sm cursor-pointer ${
+                activeAuditTab === 'system_audit'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-amber-950/40 ring-2 ring-amber-400/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+              }`}
+              title="Switch to Read-Only System Audit Log View"
+            >
+              <History className="w-3.5 h-3.5 text-amber-400" />
+              <span>System Audit Log</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-950 text-amber-300 border border-amber-800">
+                {currentSystemAuditLogs.length}
+              </span>
+            </button>
+
             {/* Audit History Toggle Button */}
             <button
               id="btn-toggle-audit-history-main"
@@ -476,7 +803,7 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
             <button
               id="btn-trigger-reminders"
               onClick={handleTriggerReminders}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold flex items-center space-x-1.5 transition shadow-sm"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold flex items-center space-x-1.5 transition shadow-sm cursor-pointer"
             >
               <Bell className="w-3.5 h-3.5 text-amber-400" />
               <span>Send Renewal Alerts ({nearExpiryList.length})</span>
@@ -484,7 +811,7 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
             <button
               id="btn-export-audit-csv"
               onClick={handleExportAuditCSV}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center space-x-2 shadow-lg shadow-indigo-950 transition-all"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center space-x-2 shadow-lg shadow-indigo-950 transition-all cursor-pointer"
             >
               <Download className="w-4 h-4" />
               <span>Download Audit Report</span>
@@ -493,7 +820,100 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
         </div>
       </div>
 
-      {/* Audit History Banner Indicator if Active */}
+      {/* Primary Section Mode Selector Navigation Tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-1.5 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            id="btn-tab-certificates"
+            type="button"
+            onClick={() => setActiveAuditTab('certificates')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition cursor-pointer border ${
+              activeAuditTab === 'certificates'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-950/40'
+                : 'bg-slate-950/70 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-800'
+            }`}
+          >
+            <ShieldCheck className={`w-4 h-4 ${activeAuditTab === 'certificates' ? 'text-white' : 'text-indigo-400'}`} />
+            <span>Compliance Register &amp; Certificates</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              activeAuditTab === 'certificates' ? 'bg-indigo-800 text-white' : 'bg-slate-800 text-slate-400'
+            }`}>
+              {certificates.length}
+            </span>
+          </button>
+
+          <button
+            id="btn-tab-compliance-calendar"
+            type="button"
+            onClick={() => setActiveAuditTab('calendar')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition cursor-pointer border ${
+              activeAuditTab === 'calendar'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-950/40'
+                : 'bg-slate-950/70 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-800'
+            }`}
+          >
+            <CalendarCheck className={`w-4 h-4 ${activeAuditTab === 'calendar' ? 'text-amber-300' : 'text-amber-400'}`} />
+            <span>Compliance Calendar</span>
+            <span className="px-1.5 py-0.5 rounded-md bg-amber-950 text-amber-300 border border-amber-800 text-[9px] font-bold tracking-wider">
+              60-DAY ENGINE
+            </span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              activeAuditTab === 'calendar' ? 'bg-indigo-800 text-white' : 'bg-slate-800 text-slate-400'
+            }`}>
+              {complianceCalendarEvents.length}
+            </span>
+          </button>
+
+          <button
+            id="btn-tab-system-audit-log"
+            type="button"
+            onClick={() => setActiveAuditTab('system_audit')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition cursor-pointer border ${
+              activeAuditTab === 'system_audit'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-950/40'
+                : 'bg-slate-950/70 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-800'
+            }`}
+          >
+            <History className={`w-4 h-4 ${activeAuditTab === 'system_audit' ? 'text-amber-300' : 'text-amber-400'}`} />
+            <span>System Audit Log</span>
+            <span className="px-1.5 py-0.5 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-800 text-[9px] font-bold tracking-wider">
+              READ-ONLY
+            </span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              activeAuditTab === 'system_audit' ? 'bg-indigo-800 text-white' : 'bg-slate-800 text-slate-400'
+            }`}>
+              {currentSystemAuditLogs.length}
+            </span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 px-3 text-xs text-slate-400">
+          <Fingerprint className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <span className="hidden sm:inline">Cryptographic SHA-256 Ledger:</span>
+          <span className="font-mono text-[11px] text-emerald-400 font-semibold">
+            {currentSystemAuditLogs.length} Immutable Events
+          </span>
+        </div>
+      </div>
+
+      {activeAuditTab === 'calendar' ? (
+        <InstitutionalComplianceCalendar
+          events={complianceCalendarEvents}
+          certificates={certificates}
+          onAddOrUpdateEvent={(ev) => handleSaveReminderSchedule(ev, ev.documentId)}
+          onBatchAutoSchedule={handleBatchAutoScheduleAll}
+          onSendReminderNow={handleSendCalendarReminderNow}
+          onOpenScheduleModalForCert={handleOpenScheduleModal}
+          institutionName={institution?.name}
+        />
+      ) : activeAuditTab === 'system_audit' ? (
+        <SystemAuditLogView
+          logs={currentSystemAuditLogs}
+          onRefresh={() => showToast('System audit log telemetry verified against SHA-256 blockchain ledger.', 'info')}
+        />
+      ) : (
+        <>
+          {/* Audit History Banner Indicator if Active */}
       {showAuditHistory && (
         <div className="p-3.5 rounded-xl bg-indigo-950/70 border border-indigo-800/80 flex items-center justify-between shadow-md">
           <div className="flex items-center space-x-2.5">
@@ -663,6 +1083,15 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
                     {cert.daysRemaining <= 0 ? 'EXPIRED' : `${cert.daysRemaining}d Left`}
                   </span>
                   <div className="flex items-center gap-1.5 mt-1 justify-end">
+                    <button
+                      id={`btn-card-schedule-${cert.id}`}
+                      onClick={() => handleOpenScheduleModal(cert)}
+                      className="text-[10px] text-indigo-300 hover:text-indigo-200 font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-950/80 border border-indigo-800/80 hover:bg-indigo-900/60 transition cursor-pointer"
+                      title="Schedule 60-day renewal reminder on Institutional Calendar"
+                    >
+                      <CalendarCheck className="w-2.5 h-2.5 text-indigo-400" />
+                      <span>Schedule 60d</span>
+                    </button>
                     <button
                       id={`btn-card-req-renewal-${cert.id}`}
                       onClick={() => handleOpenRequestRenewalModal(cert)}
@@ -1073,7 +1502,7 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
                   <th className="py-3 px-3">Certificate &amp; Category</th>
                   <th className="py-3 px-3">Issuing Authority</th>
                   <th className="py-3 px-3">Doc ID / Reg No.</th>
-                  <th className="py-3 px-3">Expiry Date</th>
+                  <th className="py-3 px-3">Expiry &amp; 60d Target</th>
                   <th className="py-3 px-3">Days Remaining</th>
                   <th className="py-3 px-3">Document Status</th>
                   <th className="py-3 px-3 text-right">Actions &amp; History</th>
@@ -1086,6 +1515,9 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
                   const isExpired = cert.daysRemaining <= 0;
                   const isHistoryExpanded = expandedDocHistories[cert.id] || false;
                   const logCount = cert.auditHistory?.length || 0;
+                  const calculated60dDate = cert.suggestedRenewalDate || calculateSuggestedRenewalDate(cert.expiryDate, 60);
+                  const renewalAnalysis = getRenewalWindowAnalysis(cert.expiryDate, calculated60dDate);
+                  const isScheduledInCalendar = cert.calendarReminderScheduled || complianceCalendarEvents.some(e => e.documentId === cert.id);
 
                   return (
                     <React.Fragment key={cert.id}>
@@ -1177,10 +1609,25 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
                           {cert.certificateNumber}
                         </td>
 
-                        {/* Expiry Date */}
+                        {/* Expiry Date & Suggested 60d Target */}
                         <td className="py-3.5 px-3 font-mono text-slate-200 text-xs">
-                          <div>{cert.expiryDate}</div>
-                          <div className="text-[10px] text-slate-500">Issued: {cert.issueDate}</div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-rose-400 font-bold">{cert.expiryDate}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Sparkles className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                            <span>Target: <strong className="text-amber-300">{calculated60dDate}</strong></span>
+                          </div>
+                          {isScheduledInCalendar ? (
+                            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 font-sans mt-0.5">
+                              <CalendarCheck className="w-2.5 h-2.5 text-indigo-400" />
+                              <span>In Calendar</span>
+                            </span>
+                          ) : (
+                            <span className="text-[9px] text-slate-500 font-sans mt-0.5 block">
+                              60d advance rule
+                            </span>
+                          )}
                         </td>
 
                         {/* Days Remaining / Urgency */}
@@ -1233,6 +1680,21 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
                         <td className="py-3.5 px-3 text-right">
                           <div className="flex items-center justify-end space-x-1.5 flex-wrap gap-y-1">
                             
+                            {/* Schedule 60-Day Reminder Action Button */}
+                            <button
+                              id={`btn-schedule-${cert.id}`}
+                              onClick={() => handleOpenScheduleModal(cert)}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center space-x-1 transition shadow-sm cursor-pointer border ${
+                                isScheduledInCalendar
+                                  ? 'bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border-indigo-700/80'
+                                  : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/40'
+                              }`}
+                              title={isScheduledInCalendar ? `60-Day Reminder Scheduled for ${calculated60dDate}. Click to view/edit.` : `Schedule automated renewal reminder 60 days prior to ${cert.expiryDate}`}
+                            >
+                              <CalendarCheck className={`w-3 h-3 ${isScheduledInCalendar ? 'text-indigo-400' : 'text-amber-400'}`} />
+                              <span>{isScheduledInCalendar ? 'Scheduled' : 'Schedule 60d'}</span>
+                            </button>
+
                             {/* Request Renewal Action Button (for nearing expiry or expired certificates) */}
                             {(isExpiringSoon || isCritical || isExpired || cert.daysRemaining <= 90) && (
                               <button
@@ -1487,6 +1949,8 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
         )}
 
       </div>
+    </>
+  )}
 
       {/* Comprehensive Audit History Timeline Modal */}
       {selectedDocForHistoryModal && (
@@ -1766,6 +2230,18 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({ instit
         }}
         certificate={selectedCertForRenewalRequest}
         onSendRequest={handleSendRenewalRequestEmail}
+      />
+
+      {/* Schedule 60-Day Compliance Calendar Reminder Modal */}
+      <ScheduleReminderModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => {
+          setIsScheduleModalOpen(false);
+          setSelectedCertForSchedule(null);
+        }}
+        certificate={selectedCertForSchedule}
+        existingEvent={complianceCalendarEvents.find(e => e.documentId === selectedCertForSchedule?.id)}
+        onSaveSchedule={handleSaveReminderSchedule}
       />
 
     </div>

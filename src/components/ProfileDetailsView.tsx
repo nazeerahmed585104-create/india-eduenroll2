@@ -16,9 +16,13 @@ import {
   Edit3, 
   Save, 
   X,
-  FileCheck2
+  FileCheck2,
+  Sparkles,
+  Search,
+  Lock
 } from 'lucide-react';
 import { InstitutionProfileData } from '../types/education';
+import { SEOEditor } from './seo/SEOEditor';
 
 interface ProfileDetailsViewProps {
   institution: InstitutionProfileData;
@@ -30,6 +34,19 @@ export const ProfileDetailsView: React.FC<ProfileDetailsViewProps> = ({
   onUpdateProfile
 }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [isSEOEditorOpen, setIsSEOEditorOpen] = useState(false);
+  const [seoOverrides, setSeoOverrides] = useState<{
+    metaTitle: string;
+    metaDescription: string;
+    canonicalUrl: string;
+    jsonLdSchema?: string;
+    schemaType?: any;
+  }>({
+    metaTitle: `${institution.name} Admissions, Courses & Fees 2026`,
+    metaDescription: `Explore ${institution.name} ranking, degrees, fee structure, placements, admission cutoff, and campus facilities.`,
+    canonicalUrl: `https://eduplatform.example/institutions/${institution.id}`,
+    schemaType: 'CollegeOrUniversity'
+  });
   const [formData, setFormData] = useState({
     name: institution.name,
     legalEntityType: institution.legalEntityType,
@@ -42,16 +59,16 @@ export const ProfileDetailsView: React.FC<ProfileDetailsViewProps> = ({
     officialEmail: institution.officialEmail,
     mobileNumber: institution.mobileNumber,
     website: institution.website,
-    about: institution.about,
-    city: institution.address.city,
-    state: institution.address.state,
-    pinCode: institution.address.pinCode,
-    registeredAddress: institution.address.registeredAddress,
-    campusAddress: institution.address.campusAddress,
-    contactName: institution.contactPerson.name,
-    contactDesignation: institution.contactPerson.designation,
-    contactEmail: institution.contactPerson.email,
-    contactPhone: institution.contactPerson.phone
+    about: institution.about || '',
+    city: institution.address?.city || '',
+    state: institution.address?.state || '',
+    pinCode: institution.address?.pinCode || '',
+    registeredAddress: institution.address?.registeredAddress || '',
+    campusAddress: institution.address?.campusAddress || '',
+    contactName: institution.contactPerson?.name || '',
+    contactDesignation: institution.contactPerson?.designation || '',
+    contactEmail: institution.contactPerson?.email || institution.officialEmail || '',
+    contactPhone: institution.contactPerson?.phone || institution.mobileNumber || ''
   });
 
   const handleSave = () => {
@@ -72,7 +89,7 @@ export const ProfileDetailsView: React.FC<ProfileDetailsViewProps> = ({
         registeredAddress: formData.registeredAddress,
         campusAddress: formData.campusAddress,
         city: formData.city,
-        district: institution.address.district,
+        district: institution.address?.district || formData.city,
         state: formData.state,
         pinCode: formData.pinCode
       },
@@ -371,17 +388,17 @@ export const ProfileDetailsView: React.FC<ProfileDetailsViewProps> = ({
 
             <div className="space-y-3 text-xs">
               <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/80 space-y-2">
-                <div className="font-semibold text-white text-sm">{institution.contactPerson.name}</div>
-                <div className="text-indigo-400 font-medium">{institution.contactPerson.designation}</div>
+                <div className="font-semibold text-white text-sm">{institution.contactPerson?.name || 'Authorized Signatory'}</div>
+                <div className="text-indigo-400 font-medium">{institution.contactPerson?.designation || 'Registrar / Dean'}</div>
                 
                 <div className="pt-2 border-t border-slate-800 space-y-1.5 text-slate-300">
                   <div className="flex items-center gap-2">
                     <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">{institution.contactPerson.email}</span>
+                    <span className="truncate">{institution.contactPerson?.email || institution.officialEmail || 'compliance@campus.edu'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>{institution.contactPerson.phone}</span>
+                    <span>{institution.contactPerson?.phone || institution.mobileNumber || '+91 98765 43210'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -428,6 +445,48 @@ export const ProfileDetailsView: React.FC<ProfileDetailsViewProps> = ({
             </div>
           </div>
 
+          {/* SEO & Search Engine Indexing Card */}
+          <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-white flex items-center space-x-2">
+                <Search className="w-4 h-4 text-amber-400" />
+                <span>SEO &amp; Search Indexing</span>
+              </h3>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 flex items-center gap-1 font-mono">
+                <Lock className="w-2.5 h-2.5" /> Admin Only
+              </span>
+            </div>
+
+            <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs space-y-2">
+              <div>
+                <span className="text-[10px] text-slate-400 block font-semibold">Meta Title</span>
+                <p className="text-slate-200 font-medium truncate">{seoOverrides.metaTitle}</p>
+              </div>
+              <div className="pt-1.5 border-t border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-semibold">Meta Description</span>
+                <p className="text-slate-300 text-[11px] line-clamp-2">{seoOverrides.metaDescription}</p>
+              </div>
+              <div className="pt-1.5 border-t border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-semibold">Canonical URL</span>
+                <p className="text-emerald-400 font-mono text-[10px] truncate">{seoOverrides.canonicalUrl}</p>
+              </div>
+              <div className="pt-1.5 border-t border-slate-800 flex items-center justify-between">
+                <span className="text-[10px] text-slate-400 font-semibold">JSON-LD Schema</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800 font-mono">
+                  @{seoOverrides.schemaType || 'CollegeOrUniversity'} Active
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsSEOEditorOpen(true)}
+              className="w-full py-2 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/30 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Edit SEO Meta, Canonical &amp; Schema (Admin)</span>
+            </button>
+          </div>
+
           {/* Uploaded Documents Quick Access */}
           <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 shadow-sm space-y-4">
             <h3 className="text-sm font-semibold text-white flex items-center space-x-2">
@@ -459,6 +518,42 @@ export const ProfileDetailsView: React.FC<ProfileDetailsViewProps> = ({
         </div>
 
       </div>
+
+      {/* SEO Editor Modal */}
+      {isSEOEditorOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="relative w-full max-w-5xl my-8">
+            <SEOEditor
+              isAdmin={true}
+              userRole="Super Admin"
+              activeEntity={{
+                id: institution.id,
+                name: institution.name,
+                seoTitle: seoOverrides.metaTitle,
+                metaDescription: seoOverrides.metaDescription,
+                canonicalUrl: seoOverrides.canonicalUrl,
+                jsonLdSchema: seoOverrides.jsonLdSchema,
+                schemaType: seoOverrides.schemaType,
+                location: `${formData.city}, ${formData.state}`,
+                overview: formData.about || `Established in ${formData.establishmentYear}, ${formData.name} offers comprehensive education.`
+              }}
+              entityType="university"
+              displayMode="modal"
+              onClose={() => setIsSEOEditorOpen(false)}
+              onSave={(updated) => {
+                setSeoOverrides({
+                  metaTitle: updated.metaTitle,
+                  metaDescription: updated.metaDescription,
+                  canonicalUrl: updated.canonicalUrl,
+                  jsonLdSchema: updated.jsonLdSchema,
+                  schemaType: updated.schemaType
+                });
+                setIsSEOEditorOpen(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

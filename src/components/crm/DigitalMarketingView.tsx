@@ -22,9 +22,11 @@ import {
   INITIAL_AD_CAMPAIGNS, 
   INITIAL_UTM_PARAMS 
 } from '../../data/crmMarketingData';
+import { AIThumbnailPreparationModule } from './AIThumbnailPreparationModule';
+import { MetaAdsAdvertisingModule } from './MetaAdsAdvertisingModule';
 
 export const DigitalMarketingView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'campaigns' | 'utm_builder' | 'creative_performance'>('campaigns');
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'meta_ads' | 'ai_thumbnails' | 'utm_builder' | 'creative_performance'>('campaigns');
   const [campaigns, setCampaigns] = useState<AdCampaign[]>(INITIAL_AD_CAMPAIGNS);
   const [utmParams, setUtmParams] = useState<UTMParameter[]>(INITIAL_UTM_PARAMS);
 
@@ -101,7 +103,9 @@ export const DigitalMarketingView: React.FC = () => {
         {/* Tab Controls */}
         <div className="pt-2 border-t border-purple-900/40 flex items-center space-x-2 overflow-x-auto">
           {[
-            { id: 'campaigns', label: 'Ad Platform Campaigns (Google/Meta/LinkedIn)', icon: <BarChart2 className="w-3.5 h-3.5" /> },
+            { id: 'campaigns', label: 'Paid Multi-Channel Overview', icon: <BarChart2 className="w-3.5 h-3.5" /> },
+            { id: 'meta_ads', label: 'Facebook & Instagram Advertising Hub', icon: <Megaphone className="w-3.5 h-3.5" /> },
+            { id: 'ai_thumbnails', label: 'AI Thumbnail Preparation Studio', icon: <Sparkles className="w-3.5 h-3.5" /> },
             { id: 'utm_builder', label: 'UTM Tracking & Link Builder', icon: <Link className="w-3.5 h-3.5" /> },
             { id: 'creative_performance', label: 'Channel Attribution & ROAS', icon: <Target className="w-3.5 h-3.5" /> }
           ].map(tab => (
@@ -120,6 +124,16 @@ export const DigitalMarketingView: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Meta Advertising Hub */}
+      {activeTab === 'meta_ads' && (
+        <MetaAdsAdvertisingModule />
+      )}
+
+      {/* AI Thumbnail Preparation Studio */}
+      {activeTab === 'ai_thumbnails' && (
+        <AIThumbnailPreparationModule />
+      )}
 
       {/* 1. Paid Campaigns Tab */}
       {activeTab === 'campaigns' && (

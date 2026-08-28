@@ -399,9 +399,60 @@ export const INITIAL_INSTITUTIONS: Record<string, InstitutionProfileData> = {
       topRecruiters: ['Microsoft', 'Google Cloud', 'TCS Digital', 'Infosys', 'Barclays', 'Amazon AWS']
     },
     documents: [
-      { id: 'doc-1', name: 'AICTE_Approval_Letter_2026.pdf', type: 'Accreditation', status: 'approved', uploadDate: '2026-01-15', fileSize: '2.4 MB' },
-      { id: 'doc-2', name: 'NAAC_Grade_A_Plus_Certificate.pdf', type: 'Accreditation', status: 'approved', uploadDate: '2026-02-10', fileSize: '3.1 MB' },
-      { id: 'doc-3', name: 'College_PAN_GST_Registration.pdf', type: 'PAN', status: 'approved', uploadDate: '2026-01-10', fileSize: '1.2 MB' }
+      { 
+        id: 'doc-1', 
+        name: 'AICTE_Extension_of_Approval_2025_26.pdf', 
+        type: 'Accreditation', 
+        category: 'Accreditation',
+        tags: ['AICTE', 'Engineering'],
+        status: 'Nearing Expiry', 
+        uploadDate: '2025-08-20', 
+        expiryDate: '2026-09-30',
+        fileSize: '2.4 MB',
+        complianceOfficerName: 'Dr. Sudhir Deshmukh',
+        complianceOfficerEmail: 'compliance.officer@stxaviers-engg.edu.in',
+        issuingAuthority: 'All India Council for Technical Education (AICTE)'
+      },
+      { 
+        id: 'doc-2', 
+        name: 'NAAC_Grade_A_Plus_Certificate.pdf', 
+        type: 'Accreditation', 
+        category: 'Accreditation',
+        tags: ['NAAC', 'Quality Rating'],
+        status: 'approved', 
+        uploadDate: '2026-02-10', 
+        expiryDate: '2031-02-10',
+        fileSize: '3.1 MB',
+        complianceOfficerName: 'Dr. Sudhir Deshmukh',
+        complianceOfficerEmail: 'compliance.officer@stxaviers-engg.edu.in',
+        issuingAuthority: 'NAAC Bengaluru'
+      },
+      { 
+        id: 'doc-3', 
+        name: 'State_Pollution_Control_Board_NOC.pdf', 
+        type: 'Affiliation_Letter', 
+        category: 'Legal',
+        tags: ['Environment', 'Safety NOC'],
+        status: 'Nearing Expiry', 
+        uploadDate: '2025-09-12', 
+        expiryDate: '2026-09-15',
+        fileSize: '1.8 MB',
+        complianceOfficerName: 'Capt. Ramesh Kulkarni (Estate & Safety)',
+        complianceOfficerEmail: 'safety.officer@stxaviers-engg.edu.in',
+        issuingAuthority: 'State Pollution & Safety Board'
+      },
+      { 
+        id: 'doc-4', 
+        name: 'College_PAN_GST_Registration.pdf', 
+        type: 'PAN', 
+        category: 'Finance',
+        tags: ['Taxation', 'GST'],
+        status: 'approved', 
+        uploadDate: '2026-01-10', 
+        fileSize: '1.2 MB',
+        complianceOfficerName: 'Dr. Sudhir Deshmukh',
+        complianceOfficerEmail: 'compliance.officer@stxaviers-engg.edu.in'
+      }
     ]
   },
 
@@ -521,7 +572,16 @@ export const INITIAL_INSTITUTIONS: Record<string, InstitutionProfileData> = {
     ],
     enquiries: [],
     documents: [
-      { id: 'doc-cu-1', name: 'Central_Act_Gazette_Notification.pdf', type: 'Registration_Certificate', status: 'approved', uploadDate: '2025-01-01', fileSize: '5.2 MB' }
+      { 
+        id: 'doc-cu-1', 
+        name: 'Central_Act_Gazette_Notification.pdf', 
+        type: 'Registration_Certificate', 
+        category: 'Legal',
+        tags: ['Central Govt', 'Statutory Gazette'],
+        status: 'approved', 
+        uploadDate: '2025-01-01', 
+        fileSize: '5.2 MB' 
+      }
     ]
   },
 
@@ -1331,6 +1391,29 @@ export function getOrCreateInstitution(type: ProfileType): InstitutionProfileDat
     ],
     applications: [],
     enquiries: [],
-    documents: []
+    documents: [
+      {
+        id: `doc-${type}-1`,
+        name: `${meta.badge}_Statutory_Accreditation_Renewal_2026.pdf`,
+        type: 'Accreditation',
+        status: 'Nearing Expiry',
+        uploadDate: '2025-09-10',
+        expiryDate: '2026-09-30',
+        fileSize: '2.6 MB',
+        complianceOfficerName: 'Dr. Sudhir Deshmukh',
+        complianceOfficerEmail: `compliance.officer@${type.replace(/_/g, '')}-portal.edu.in`,
+        issuingAuthority: 'Apex Statutory Accreditation Council'
+      },
+      {
+        id: `doc-${type}-2`,
+        name: `${meta.badge}_Affiliation_Letter_Permanent.pdf`,
+        type: 'Affiliation_Letter',
+        status: 'approved',
+        uploadDate: '2026-01-15',
+        fileSize: '1.9 MB',
+        complianceOfficerName: 'Dr. Sudhir Deshmukh',
+        complianceOfficerEmail: `compliance.officer@${type.replace(/_/g, '')}-portal.edu.in`
+      }
+    ]
   };
 }

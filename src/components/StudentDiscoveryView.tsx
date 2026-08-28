@@ -41,12 +41,25 @@ import {
   HelpCircle,
   Zap,
   Lock,
-  ArrowUpRight
+  ArrowUpRight,
+  Video,
+  Wrench,
+  Award,
+  Briefcase,
+  X,
+  ChevronRight,
+  Code,
+  FolderGit2
 } from 'lucide-react';
 import { CourseProgram, InstitutionProfileData, StudentApplication, ListingPlanTier } from '../types/education';
 import { RazorpayPaymentModal } from './RazorpayPaymentModal';
 import { PaymentGateway } from './PaymentGateway';
 import { RazorpayTransactionRecord } from '../types/razorpay';
+import { COURSE_CATEGORIES_TAXONOMY, SAMPLE_TAXONOMY_COURSES } from '../data/coursesTaxonomyData';
+import { DigitalLearningLMSView } from './student/DigitalLearningLMSView';
+import { PracticalTrainingView } from './student/PracticalTrainingView';
+import { CertificationHubView } from './student/CertificationHubView';
+import { CareerPlacementView } from './student/CareerPlacementView';
 
 interface StudentDiscoveryViewProps {
   institutions: Record<string, InstitutionProfileData>;
@@ -56,6 +69,10 @@ interface StudentDiscoveryViewProps {
 type StudentTab = 
   | 'home'
   | 'courses'
+  | 'digital_lms'
+  | 'practical_training'
+  | 'certification'
+  | 'career_module'
   | 'tutors'
   | 'institutes'
   | 'coaching'
@@ -79,11 +96,14 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
   const [activeStudentTab, setActiveStudentTab] = useState<StudentTab>('home');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedMode, setSelectedMode] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedSubSkill, setSelectedSubSkill] = useState<string>('All');
   const [maxBudget, setMaxBudget] = useState<number>(350000);
   const [compareList, setCompareList] = useState<{ course: CourseProgram; inst: InstitutionProfileData }[]>([]);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
   const [applyModalItem, setApplyModalItem] = useState<{ course: CourseProgram; inst: InstitutionProfileData } | null>(null);
   const [enquiryModalItem, setEnquiryModalItem] = useState<{ course?: CourseProgram; inst?: InstitutionProfileData } | null>(null);
+  const [syllabusInspectorItem, setSyllabusInspectorItem] = useState<{ course: CourseProgram; inst: InstitutionProfileData } | null>(null);
 
   // Student apply form state
   const [applicantName, setApplicantName] = useState<string>('Aarav Sharma');
@@ -210,7 +230,8 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
       const matchesSearch = course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             inst.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             (course.department && course.department.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                            (course.subject && course.subject.toLowerCase().includes(searchQuery.toLowerCase()));
+                            (course.subject && course.subject.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                            (course.primarySkill && course.primarySkill.toLowerCase().includes(searchQuery.toLowerCase()));
 
       let matchesTab = true;
       if (activeStudentTab === 'tutors') {
@@ -235,10 +256,22 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
         matchesTab = inst.profileType.includes('it');
       }
 
+      const matchesCategory = selectedCategory === 'All' ||
+        course.category === selectedCategory ||
+        (selectedCategory === 'Technology & Digital' && (course.department?.includes('Computer') || course.name.includes('AI') || course.name.includes('Python') || course.name.includes('FullStack'))) ||
+        (selectedCategory === 'Business & Professional' && (course.department?.includes('Management') || course.department?.includes('Commerce') || course.name.includes('MBA') || course.name.includes('GST'))) ||
+        (selectedCategory === 'Vocational & Industry Skills' && (course.name.includes('Electrician') || course.name.includes('Plumbing') || course.name.includes('Healthcare') || course.level === 'Diploma')) ||
+        (selectedCategory === 'Emerging Skills' && (course.name.includes('EV') || course.name.includes('Drone') || course.name.includes('Robotics') || course.name.includes('IoT') || course.name.includes('Semiconductor')));
+
+      const matchesSubSkill = selectedSubSkill === 'All' ||
+        (course.primarySkill && course.primarySkill.toLowerCase().includes(selectedSubSkill.toLowerCase())) ||
+        course.name.toLowerCase().includes(selectedSubSkill.toLowerCase()) ||
+        (course.curriculumHighlights && course.curriculumHighlights.some(h => h.toLowerCase().includes(selectedSubSkill.toLowerCase())));
+
       const matchesMode = selectedMode === 'all' || course.mode === selectedMode;
       const matchesBudget = course.fees <= maxBudget;
 
-      return matchesSearch && matchesTab && matchesMode && matchesBudget;
+      return matchesSearch && matchesTab && matchesCategory && matchesSubSkill && matchesMode && matchesBudget;
     });
   };
 
@@ -387,7 +420,47 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>All Courses ({allCoursesWithInst.length})</span>
+            <span>Skill Catalog ({allCoursesWithInst.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveStudentTab('digital_lms')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition ${
+              activeStudentTab === 'digital_lms' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Video className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Digital LMS</span>
+          </button>
+
+          <button
+            onClick={() => setActiveStudentTab('practical_training')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition ${
+              activeStudentTab === 'practical_training' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Wrench className="w-3.5 h-3.5 text-amber-400" />
+            <span>Practical &amp; Labs</span>
+          </button>
+
+          <button
+            onClick={() => setActiveStudentTab('certification')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition ${
+              activeStudentTab === 'certification' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Certification Hub</span>
+          </button>
+
+          <button
+            onClick={() => setActiveStudentTab('career_module')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition ${
+              activeStudentTab === 'career_module' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Briefcase className="w-3.5 h-3.5 text-sky-400" />
+            <span>Career &amp; ATS</span>
           </button>
 
           <button
@@ -458,16 +531,6 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
           >
             <School className="w-3.5 h-3.5" />
             <span>Residential Schools</span>
-          </button>
-
-          <button
-            onClick={() => setActiveStudentTab('it_software')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 transition ${
-              activeStudentTab === 'it_software' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Laptop className="w-3.5 h-3.5" />
-            <span>IT &amp; Software</span>
           </button>
 
           <button
@@ -688,6 +751,26 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
         </div>
       )}
 
+      {/* ----------------- TAB: DIGITAL LEARNING LMS ----------------- */}
+      {activeStudentTab === 'digital_lms' && (
+        <DigitalLearningLMSView />
+      )}
+
+      {/* ----------------- TAB: PRACTICAL & LABS ----------------- */}
+      {activeStudentTab === 'practical_training' && (
+        <PracticalTrainingView />
+      )}
+
+      {/* ----------------- TAB: CERTIFICATION HUB ----------------- */}
+      {activeStudentTab === 'certification' && (
+        <CertificationHubView />
+      )}
+
+      {/* ----------------- TAB: CAREER & PLACEMENT ----------------- */}
+      {activeStudentTab === 'career_module' && (
+        <CareerPlacementView />
+      )}
+
       {/* ----------------- TAB: COURSES / DIRECTORY ----------------- */}
       {(activeStudentTab === 'courses' || 
         activeStudentTab === 'colleges' || 
@@ -701,6 +784,84 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
         activeStudentTab === 'state_coaching') && (
         <div className="space-y-6">
           
+          {/* 4 Primary Course Categories Bar */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Standardized Skill Disciplines &amp; Categories</span>
+              </h3>
+              {selectedCategory !== 'All' && (
+                <button
+                  onClick={() => { setSelectedCategory('All'); setSelectedSubSkill('All'); }}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 underline"
+                >
+                  Reset Category
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {COURSE_CATEGORIES_TAXONOMY.map((cat) => {
+                const isSelected = selectedCategory === cat.category;
+                return (
+                  <button
+                    key={cat.category}
+                    onClick={() => {
+                      setSelectedCategory(isSelected ? 'All' : cat.category);
+                      setSelectedSubSkill('All');
+                    }}
+                    className={`p-3.5 rounded-2xl border text-left transition-all ${
+                      isSelected
+                        ? 'bg-indigo-950/80 border-indigo-500 shadow-md shadow-indigo-950 text-white'
+                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                    }`}
+                  >
+                    <div className="font-bold text-xs text-white">{cat.category}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{cat.description}</div>
+                    <div className="text-[9px] text-indigo-400 font-semibold mt-1">
+                      {cat.skills.length} Specializations
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Sub-Skills Filter Chips */}
+            {selectedCategory !== 'All' && (
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                <div className="text-[11px] font-semibold text-slate-300">
+                  Select {selectedCategory} Sub-Skill:
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setSelectedSubSkill('All')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                      selectedSubSkill === 'All'
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    All {selectedCategory}
+                  </button>
+                  {COURSE_CATEGORIES_TAXONOMY.find(c => c.category === selectedCategory)?.skills.map((skill) => (
+                    <button
+                      key={skill.id}
+                      onClick={() => setSelectedSubSkill(skill.name === selectedSubSkill ? 'All' : skill.name)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                        selectedSubSkill === skill.name
+                          ? 'bg-indigo-600 text-white border-indigo-600 font-bold'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {skill.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Filter Bar */}
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-sm">
             
@@ -708,7 +869,7 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search filtered course, syllabus topic, branch..."
+                placeholder="Search filtered course, syllabus topic, branch, programming language..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
@@ -751,6 +912,8 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
           <div className="flex items-center justify-between text-xs text-slate-400">
             <div>
               Showing <span className="font-bold text-white">{filteredCourses.length}</span> programs matching your filters
+              {selectedCategory !== 'All' && <span className="ml-1 text-indigo-400 font-medium">in {selectedCategory}</span>}
+              {selectedSubSkill !== 'All' && <span className="ml-1 text-amber-400 font-medium">({selectedSubSkill})</span>}
             </div>
             {compareList.length > 0 && (
               <button
@@ -781,9 +944,14 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
                     {/* Header */}
                     <div className="p-4 bg-slate-950/80 border-b border-slate-800 flex items-start justify-between gap-2">
                       <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {getListingBadge(planTier)}
                           <span className="text-[10px] text-slate-400 font-mono">{course.code}</span>
+                          {course.category && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                              {course.category}
+                            </span>
+                          )}
                         </div>
                         <h4 className="font-bold text-xs text-white truncate max-w-[210px]">{inst.name}</h4>
                         <div className="text-[11px] text-slate-400 flex items-center gap-1">
@@ -828,6 +996,19 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
                           ))}
                         </div>
                       )}
+
+                      {/* 9-Tier Syllabus & Batches Inspection Button */}
+                      <button
+                        type="button"
+                        onClick={() => setSyllabusInspectorItem({ course, inst })}
+                        className="w-full py-1.5 px-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-indigo-500/50 text-[11px] text-indigo-300 flex items-center justify-between transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>View 9-Tier Syllabus &amp; Live Batches</span>
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
+                      </button>
                     </div>
                   </div>
 
@@ -1632,6 +1813,153 @@ export const StudentDiscoveryView: React.FC<StudentDiscoveryViewProps> = ({
           console.warn('Payment failed callback:', err);
         }}
       />
+
+      {/* ----------------- 9-TIER SYLLABUS & LIVE BATCHES INSPECTOR MODAL ----------------- */}
+      {syllabusInspectorItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6 shadow-2xl animate-in fade-in">
+            
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-800">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    {syllabusInspectorItem.course.level} Program
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {syllabusInspectorItem.course.code}
+                  </span>
+                  {syllabusInspectorItem.course.category && (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {syllabusInspectorItem.course.category}
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-xl font-bold text-white">{syllabusInspectorItem.course.name}</h3>
+                <p className="text-xs text-slate-400">
+                  Offered by <strong>{syllabusInspectorItem.inst.name}</strong> &bull; {syllabusInspectorItem.inst.address.city}, {syllabusInspectorItem.inst.address.state}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setSyllabusInspectorItem(null)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 9-Tier Breakdown Diagram */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Layers className="w-4 h-4 text-indigo-400" />
+                <span>9-Tier Course Structure &amp; Progression</span>
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-indigo-400 font-bold uppercase">Tier 1 - 3 &bull; Foundations</span>
+                  <div className="font-bold text-white text-sm">Course &rarr; Modules &rarr; Units</div>
+                  <p className="text-slate-400 text-[11px]">Structured micro-concepts mapped to National Occupational Standards (NOS).</p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-amber-400 font-bold uppercase">Tier 4 - 6 &bull; Practical</span>
+                  <div className="font-bold text-white text-sm">Lessons &rarr; Labs &rarr; Assignments</div>
+                  <p className="text-slate-400 text-[11px]">Hands-on IDE workspaces, cloud sandboxes, and rubric-graded tasks.</p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-emerald-400 font-bold uppercase">Tier 7 - 9 &bull; Validation</span>
+                  <div className="font-bold text-white text-sm">Assessments &rarr; Project &rarr; Cert</div>
+                  <p className="text-slate-400 text-[11px]">Proctored exams, industry capstone defense, and verifiable SHA-256 seal.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Available Batches */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-emerald-400" />
+                <span>Upcoming Enrollment Batches &amp; Timings</span>
+              </h4>
+
+              <div className="space-y-2">
+                {(syllabusInspectorItem.course.availableBatches || [
+                  { id: 'b1', startDate: '2026-09-01', schedule: 'Mon-Wed-Fri 7:00 PM - 9:30 PM IST', totalSeats: 40, seatsLeft: 12 },
+                  { id: 'b2', startDate: '2026-09-15', schedule: 'Sat-Sun 10:00 AM - 3:00 PM IST (Weekend)', totalSeats: 50, seatsLeft: 24 }
+                ]).map((batch, idx) => (
+                  <div key={idx} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-bold text-white flex items-center gap-2">
+                        <span>Cohort {idx + 1}: Starting {batch.startDate}</span>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] border border-emerald-500/30">
+                          {batch.seatsLeft} Seats Remaining
+                        </span>
+                      </div>
+                      <div className="text-slate-400 text-[11px] mt-0.5">{batch.schedule}</div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSyllabusInspectorItem(null);
+                        handleOpenApplyModal(syllabusInspectorItem);
+                      }}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition shadow"
+                    >
+                      Book Batch
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Highlights & Inclusions */}
+            {syllabusInspectorItem.course.curriculumHighlights && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-300">Curriculum Highlights:</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {syllabusInspectorItem.course.curriculumHighlights.map((h, i) => (
+                    <div key={i} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center gap-2 text-slate-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span>{h}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+              <div>
+                <span className="text-slate-400 text-xs">Total Program Fee</span>
+                <div className="text-xl font-bold text-white">₹{syllabusInspectorItem.course.fees.toLocaleString()}</div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSyllabusInspectorItem(null)}
+                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = syllabusInspectorItem;
+                    setSyllabusInspectorItem(null);
+                    handleOpenApplyModal(item);
+                  }}
+                  className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5"
+                >
+                  <span>Apply Now</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

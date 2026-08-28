@@ -75,26 +75,60 @@ export interface DocumentItem {
   id: string;
   name: string;
   type: 'PAN' | 'GST' | 'Registration_Certificate' | 'Accreditation' | 'Affiliation_Letter' | 'Brochure' | 'KYC_Doc' | 'Other';
-  status: 'approved' | 'under_review' | 'rejected';
+  status: 'approved' | 'under_review' | 'rejected' | 'Nearing Expiry' | 'expired' | string;
   uploadDate: string;
   fileSize: string;
+  expiryDate?: string;
+  complianceOfficerName?: string;
+  complianceOfficerEmail?: string;
+  issuingAuthority?: string;
+  renewalRequested?: boolean;
+  renewalRequestedAt?: string;
+  category?: 'Accreditation' | 'Finance' | 'Legal' | 'Statutory' | 'Academic' | 'Administrative' | 'Infrastructure' | string;
+  tags?: string[];
+  thumbnailUrl?: string;
+  previewUrl?: string;
+  fileData?: string;
+  fileExtension?: string;
+  lastUpdatedDate?: string;
+}
+
+export interface CourseBatchItem {
+  id: string;
+  startDate: string;
+  schedule: string;
+  totalSeats: number;
+  seatsLeft: number;
+  instructor?: string;
 }
 
 export interface CourseProgram {
   id: string;
   name: string;
   code: string;
-  level: 'UG' | 'PG' | 'Diploma' | 'PhD' | 'School' | 'Certification' | 'Prelims' | 'Mains' | 'Foundation' | 'Crash_Course';
+  level: 'UG' | 'PG' | 'Diploma' | 'PhD' | 'School' | 'Certification' | 'Prelims' | 'Mains' | 'Foundation' | 'Crash_Course' | 'Professional';
   department?: string;
   subject?: string;
+  category?: 'Technology & Digital' | 'Business & Professional' | 'Vocational & Industry Skills' | 'Emerging Skills' | string;
+  primarySkill?: string;
+  secondarySkills?: string[];
   duration: string;
   fees: number;
+  originalFees?: number;
+  discountPercentage?: number;
+  scholarshipAvailable?: boolean;
+  scholarshipCriteria?: string;
   seats: number;
   enrolled: number;
   eligibility: string;
   status: 'Open' | 'Closed' | 'Closing Soon';
   mode: 'Offline' | 'Online' | 'Hybrid';
   curriculumHighlights?: string[];
+  skillsGained?: string[];
+  availableBatches?: CourseBatchItem[];
+  hasDigitalLms?: boolean;
+  hasPracticalLab?: boolean;
+  hasCertification?: boolean;
 }
 
 export interface FacultyMember {

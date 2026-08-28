@@ -1,6 +1,6 @@
 {
   "name": "EduPlatform - Institution & Partner Portal",
-  "description": "Multi-profile education platform with Regulatory Audit dashboard, Recharts compliance document status telemetry, near-expiry certificate monitor, 12-module AI CRM, WhatsApp marketing, and configurable revenue models.",
+  "description": "Enterprise multi-tier education platform featuring Dedicated SEO Modules (Public SEO Landing Pages & Admin SEO Control Panel with JSON-LD Schemas, XML Sitemaps, Robots.txt, 301 Redirects, Location SEO & AI Content CMS), AI-Generated Thumbnail Studio, Facebook & Instagram Advertising Manager with Instant Lead Forms, Course Categories & Sub-Skills Taxonomy, 9-Tier Academic Course Builder, Digital LMS, Practical Labs & Sandbox, and Placement ATS suite.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -31,7 +31,7 @@ import {
   History
 } from 'lucide-react';
 import { InstitutionProfileData, StudentApplication } from '../types/education';
-import { PaymentGateway } from './PaymentGateway';
+import { RazorpayPaymentModal } from './RazorpayPaymentModal';
 import { ApplicationActivityTimelineModal } from './ApplicationActivityTimelineModal';
 import { generatePaymentReceiptPDF } from '../utils/paymentPdfGenerator';
 import { 
@@ -164,15 +164,26 @@ export const AdmissionManagementView: React.FC<AdmissionManagementViewProps> = (
     }
   };
 
+  // Helper to find course and course fee
+  const getCourseForApp = (app: StudentApplication | null) => {
+    if (!app) return null;
+    return institution.programs.find(p => p.id === app.programId || p.name.toLowerCase() === app.programName.toLowerCase()) || null;
+  };
+
+  const getCourseFeeForApp = (app: StudentApplication | null) => {
+    const course = getCourseForApp(app);
+    return course && course.fees ? course.fees : 1500;
+  };
+
   const filteredApplications = localApplications.filter(app => {
     const matchesStatus = statusFilter === 'ALL' || app.status === statusFilter;
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch = !query ||
-                          app.applicantName.toLowerCase().includes(query) ||
-                          app.phone.toLowerCase().includes(query) ||
-                          app.email.toLowerCase().includes(query) ||
-                          app.programName.toLowerCase().includes(query) ||
-                          app.id.toLowerCase().includes(query);
+                          (app.applicantName || '').toLowerCase().includes(query) ||
+                          (app.phone || '').toLowerCase().includes(query) ||
+                          (app.email || '').toLowerCase().includes(query) ||
+                          (app.programName || '').toLowerCase().includes(query) ||
+                          (app.id || '').toLowerCase().includes(query);
     return matchesStatus && matchesSearch;
   });
 
@@ -184,12 +195,12 @@ export const AdmissionManagementView: React.FC<AdmissionManagementViewProps> = (
   );
 
   const filteredPaidApplications = paidApplications.filter(app => {
-    const q = paymentSearchQuery.toLowerCase();
+    const q = paymentSearchQuery.trim().toLowerCase();
     return (
-      app.applicantName.toLowerCase().includes(q) ||
-      app.email.toLowerCase().includes(q) ||
-      app.programName.toLowerCase().includes(q) ||
-      app.id.toLowerCase().includes(q) ||
+      (app.applicantName || '').toLowerCase().includes(q) ||
+      (app.email || '').toLowerCase().includes(q) ||
+      (app.programName || '').toLowerCase().includes(q) ||
+      (app.id || '').toLowerCase().includes(q) ||
       (app.paymentReferenceId && app.paymentReferenceId.toLowerCase().includes(q)) ||
       (app.paymentId && app.paymentId.toLowerCase().includes(q)) ||
       (app.orderId && app.orderId.toLowerCase().includes(q))
@@ -340,17 +351,6 @@ export const AdmissionManagementView: React.FC<AdmissionManagementViewProps> = (
     } finally {
       setSendingReminderAppId(null);
     }
-  };
-
-  // Helper to find course and course fee
-  const getCourseForApp = (app: StudentApplication | null) => {
-    if (!app) return null;
-    return institution.programs.find(p => p.id === app.programId || p.name.toLowerCase() === app.programName.toLowerCase()) || null;
-  };
-
-  const getCourseFeeForApp = (app: StudentApplication | null) => {
-    const course = getCourseForApp(app);
-    return course && course.fees ? course.fees : 1500;
   };
 
   const handleSendOrViewPaymentEmail = async (app: StudentApplication) => {
@@ -1718,80 +1718,82 @@ export const AdmissionManagementView: React.FC<AdmissionManagementViewProps> = (
         onStatusChange={(appId, newStatus) => handleStatusChange(appId, newStatus)}
       />
 
-      {/* Payment Gateway Modal Flow */}
-      <PaymentGateway
+      {/* Razorpay Payment Gateway Modal Flow */}
+      <RazorpayPaymentModal
         isOpen={paymentGatewayModal.isOpen}
         onClose={() => setPaymentGatewayModal(prev => ({ ...prev, isOpen: false }))}
-        application={paymentGatewayModal.application}
-        course={institution.programs.find(p => p.id === paymentGatewayModal.application?.programId) || null}
-        institution={institution}
         amount={paymentGatewayModal.amount}
-        currency="INR"
-        onSuccess={(updatedApp, paymentDetails) => {
-          const paymentId = paymentDetails.paymentId || updatedApp.paymentId || `pay_${Math.random().toString(36).substring(2, 9)}`;
-          const orderId = paymentDetails.orderId || updatedApp.orderId;
-          const paidAt = new Date().toISOString();
+        purpose={`Application Processing Fee - ${paymentGatewayModal.application?.programName || 'Academic Course'}`}
+        studentName={paymentGatewayModal.application?.applicantName || 'Student Candidate'}
+        studentEmail={paymentGatewayModal.application?.email || 'student@example.com'}
+        studentPhone={paymentGatewayModal.application?.phone || '+91 9876543210'}
+        institutionName={institution.name}
+        courseName={paymentGatewayModal.application?.programName || 'Academic Program'}
+        onSuccess={(tx) => {
+          const paymentId = tx.paymentId;
+          const orderId = tx.orderId;
+          const paidAt = tx.date || new Date().toISOString();
+          const targetApp = paymentGatewayModal.application;
+
+          if (!targetApp) return;
 
           // 1. Update application status in parent data store with 'Paid' status
           if (triggerParentStatusUpdate) {
-            triggerParentStatusUpdate(updatedApp.id, 'Paid', undefined, {
+            triggerParentStatusUpdate(targetApp.id, 'Paid', undefined, {
               paymentId,
               orderId,
-              amountPaid: paymentGatewayModal.amount,
+              amountPaid: tx.amount,
               paidAt
             });
           }
 
           // 2. Refresh local institution applications state immediately
           setLocalApplications(prev => prev.map(app => 
-            app.id === updatedApp.id 
+            app.id === targetApp.id 
               ? { 
                   ...app, 
                   status: 'Paid', 
                   applicationFeePaid: true, 
                   paymentId, 
                   orderId, 
-                  amountPaid: paymentGatewayModal.amount,
+                  amountPaid: tx.amount,
                   paidAt 
                 }
               : app
           ));
 
           // 3. Update local selected application in detail view
-          setSelectedApp(prev => prev && prev.id === updatedApp.id ? {
+          setSelectedApp(prev => prev && prev.id === targetApp.id ? {
             ...prev,
             status: 'Paid',
             applicationFeePaid: true,
             paymentId,
             orderId,
-            amountPaid: paymentGatewayModal.amount,
+            amountPaid: tx.amount,
             paidAt
           } : prev);
 
           // 4. Trigger mock email confirmation service
           sendPaymentConfirmationEmail({
-            applicantName: updatedApp.applicantName,
-            email: updatedApp.email,
-            phone: updatedApp.phone,
-            applicationId: updatedApp.id,
-            programName: updatedApp.programName,
+            applicantName: targetApp.applicantName,
+            email: targetApp.email,
+            phone: targetApp.phone,
+            applicationId: targetApp.id,
+            programName: targetApp.programName,
             paymentReferenceId: paymentId,
             orderId,
-            amountPaid: paymentGatewayModal.amount,
+            amountPaid: tx.amount,
             paidAt,
             institutionName: institution.name,
-            counsellingSlot: updatedApp.counsellingSlot
+            counsellingSlot: targetApp.counsellingSlot
           }).catch(err => console.error('Error triggering email on payment gateway success:', err));
 
           // 5. Trigger positive confirmation alert
-          setPaymentSuccessAlert(`Application fee successfully paid for ${updatedApp.applicantName}! Status updated to 'Paid' & confirmation email dispatched to ${updatedApp.email}. Payment ID: ${paymentId}`);
+          setPaymentSuccessAlert(`Application fee successfully paid for ${targetApp.applicantName}! Status updated to 'Paid' & confirmation email dispatched to ${targetApp.email}. Payment ID: ${paymentId}`);
           setTimeout(() => setPaymentSuccessAlert(null), 7000);
 
           // 6. Close payment gateway modal
           setPaymentGatewayModal(prev => ({ ...prev, isOpen: false }));
-        }}
-        onFailure={(err) => {
-          console.warn('Payment failed or dismissed:', err);
         }}
       />
 
