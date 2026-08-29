@@ -133,7 +133,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
         {currentMode === 'crm_marketing' && (
           <div className="space-y-1">
             <div className="text-[11px] font-semibold text-indigo-400 uppercase tracking-wider px-3 py-2 flex items-center justify-between">
-              <span>Growth Suite (12 Mod)</span>
+              <span>Growth Suite (13 Mod)</span>
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">PRO</span>
             </div>
             
@@ -177,6 +177,10 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               <div className="flex items-center space-x-2 text-slate-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 <span>Lead Gen &amp; CSV Ingestion</span>
+              </div>
+              <div className="flex items-center space-x-2 text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span>Financial Settlement &amp; Payouts (T+3)</span>
               </div>
               <div className="flex items-center space-x-2 text-slate-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
@@ -325,7 +329,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               <span>CRM &amp; Growth Engine</span>
             </div>
             <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 font-bold">
-              12 Mod
+              13 Mod
             </span>
           </button>
 

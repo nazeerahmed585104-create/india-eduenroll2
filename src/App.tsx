@@ -30,6 +30,7 @@ import { TelesalesWorkspaceView } from './components/TelesalesWorkspaceView';
 import { StudentDiscoveryView } from './components/StudentDiscoveryView';
 import { ListingPlanManager } from './components/ListingPlanManager';
 import { EnterprisePlatformSuite } from './components/crm/EnterprisePlatformSuite';
+import { ExploreLandingEngine } from './components/explore/ExploreLandingEngine';
 import { RegulatoryAuditView } from './components/RegulatoryAuditView';
 import { GenerateComplianceReportModal } from './components/GenerateComplianceReportModal';
 import { GenerateDocumentQRCodeModal } from './components/GenerateDocumentQRCodeModal';
@@ -164,7 +165,7 @@ export const getCategoryBadgeStyle = (category?: string) => {
 };
 
 export default function App() {
-  const [currentMode, setCurrentMode] = useState<PlatformAppMode>('partner');
+  const [currentMode, setCurrentMode] = useState<PlatformAppMode>('explore_cms');
   const [currentProfileType, setCurrentProfileType] = useState<ProfileType>('college');
   const [institutionsMap, setInstitutionsMap] = useState<Record<string, InstitutionProfileData>>(INITIAL_INSTITUTIONS);
   const [revenueConfigs, setRevenueConfigs] = useState<PartnerRevenueConfig[]>(INITIAL_REVENUE_CONFIGS);
@@ -1077,21 +1078,28 @@ export default function App() {
       />
 
       {/* Main Layout Body */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className={`flex-1 flex w-full ${currentMode === 'explore_cms' ? '' : 'max-w-7xl mx-auto'}`}>
         
         {/* Dynamic Sidebar Nav */}
-        <SidebarNav
-          currentMode={currentMode}
-          onSelectMode={handleSelectMode}
-          activeView={activeView}
-          onSelectView={setActiveView}
-          profileType={currentProfileType}
-          pendingApplicationsCount={pendingAppsCount}
-        />
+        {currentMode !== 'explore_cms' && (
+          <SidebarNav
+            currentMode={currentMode}
+            onSelectMode={handleSelectMode}
+            activeView={activeView}
+            onSelectView={setActiveView}
+            profileType={currentProfileType}
+            pendingApplicationsCount={pendingAppsCount}
+          />
+        )}
 
         {/* Content Canvas */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-y-auto">
+        <main className={`flex-1 min-w-0 overflow-y-auto ${currentMode === 'explore_cms' ? 'p-0' : 'p-4 sm:p-6 lg:p-8'}`}>
           
+          {/* EXPLORE + OFFERS CMS LANDING ENGINE */}
+          {currentMode === 'explore_cms' && activeView !== 'crm_suite' && (
+            <ExploreLandingEngine />
+          )}
+
           {/* AI CRM & DIGITAL MARKETING PLATFORM (12 MODULES) */}
           {(currentMode === 'crm_marketing' || activeView === 'crm_suite') && (
             <EnterprisePlatformSuite />

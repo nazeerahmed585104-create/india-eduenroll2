@@ -1,6 +1,6 @@
 {
   "name": "EduPlatform - Institution & Partner Portal",
-  "description": "Enterprise multi-tier education platform featuring Dedicated SEO Modules (Public SEO Landing Pages & Admin SEO Control Panel with JSON-LD Schemas, XML Sitemaps, Robots.txt, 301 Redirects, Location SEO & AI Content CMS), AI-Generated Thumbnail Studio, Facebook & Instagram Advertising Manager with Instant Lead Forms, Course Categories & Sub-Skills Taxonomy, 9-Tier Academic Course Builder, Digital LMS, Practical Labs & Sandbox, and Placement ATS suite.",
+  "description": "Enterprise multi-tier education platform featuring Reusable CMS-Driven Explore Discovery Engine (Explore Home, 12 Educational Categories, 14-Filter Course Discovery, Course Details, Exam/Subject/Instructor/Location Hubs, AI Roadmap Assistant, Offers & Coupons, Notification Alerts, Admin CMS Manager), Dedicated SEO Engine, AI CRM Suite, and Regulatory Compliance Audit Desk.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

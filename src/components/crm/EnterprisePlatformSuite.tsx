@@ -17,7 +17,8 @@ import {
   ChevronRight,
   TrendingUp,
   Users,
-  CheckCircle2
+  CheckCircle2,
+  DollarSign
 } from 'lucide-react';
 import { AIAutomationView } from './AIAutomationView';
 import { EmailMarketingView } from './EmailMarketingView';
@@ -31,6 +32,7 @@ import { AnalyticsReportingView } from './AnalyticsReportingView';
 import { AdminAuthSecurityView } from './AdminAuthSecurityView';
 import { AIThumbnailPreparationModule } from './AIThumbnailPreparationModule';
 import { MetaAdsAdvertisingModule } from './MetaAdsAdvertisingModule';
+import { CRMSettlementDashboardView } from './CRMSettlementDashboardView';
 import { CRMLead } from '../../types/crmMarketing';
 
 export type CRMModuleId = 
@@ -45,6 +47,7 @@ export type CRMModuleId =
   | 'lead_generation'
   | 'csv_import_export'
   | 'analytics'
+  | 'crm_settlement'
   | 'admin_security';
 
 interface ModuleDef {
@@ -146,10 +149,18 @@ const MODULES: ModuleDef[] = [
     badgeColor: 'bg-violet-950 text-violet-300 border-violet-800'
   },
   {
+    id: 'crm_settlement',
+    moduleNumber: 10,
+    title: 'Settlement & Payouts',
+    shortDesc: 'Escrow, UTR & Bank Reconciliation',
+    icon: <DollarSign className="w-4 h-4" />,
+    badgeColor: 'bg-amber-950 text-amber-300 border-amber-800'
+  },
+  {
     id: 'admin_security',
     moduleNumber: 11,
     title: 'Admin Auth & Security',
-    shortDesc: 'RBAC, MFA & Zero-Leakage (10/11/12)',
+    shortDesc: 'RBAC, MFA & Zero-Leakage (11/12)',
     icon: <ShieldCheck className="w-4 h-4" />,
     badgeColor: 'bg-rose-950 text-rose-300 border-rose-800'
   }
@@ -177,13 +188,13 @@ export const EnterprisePlatformSuite: React.FC = () => {
                 <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                 AI-Powered CRM + Digital Marketing + Lead Generation Platform
               </span>
-              <span className="text-[11px] text-slate-400 font-mono">12-Module Enterprise Suite</span>
+              <span className="text-[11px] text-slate-400 font-mono">13-Module Enterprise Suite</span>
             </div>
             <h1 className="text-2xl lg:text-3xl font-black text-white tracking-tight">
               Enterprise Growth Engine &amp; Admissions Command Center
             </h1>
             <p className="text-xs text-slate-300 max-w-4xl leading-relaxed">
-              Unified intelligence platform orchestrating AI lead scoring, WhatsApp business conversations, multi-channel email marketing, organic SEO rank tracking, paid digital advertising, and immutable server-side security.
+              Unified intelligence platform orchestrating AI lead scoring, WhatsApp business conversations, multi-channel email marketing, organic SEO rank tracking, paid digital advertising, partner commission settlements, and immutable server-side security.
             </p>
           </div>
 
@@ -210,7 +221,7 @@ export const EnterprisePlatformSuite: React.FC = () => {
           </div>
         </div>
 
-        {/* 12-Module Horizontal Selector Bar */}
+        {/* 13-Module Horizontal Selector Bar */}
         <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-1">
           {MODULES.map(mod => {
             const isSelected = activeModule === mod.id;
@@ -251,6 +262,7 @@ export const EnterprisePlatformSuite: React.FC = () => {
         {activeModule === 'lead_generation' && <LeadGenerationView onLeadCaptured={handleLeadCaptured} />}
         {activeModule === 'csv_import_export' && <CSVImportExportView />}
         {activeModule === 'analytics' && <AnalyticsReportingView />}
+        {activeModule === 'crm_settlement' && <CRMSettlementDashboardView />}
         {activeModule === 'admin_security' && <AdminAuthSecurityView />}
       </div>
 

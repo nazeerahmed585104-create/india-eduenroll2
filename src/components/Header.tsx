@@ -31,7 +31,7 @@ import {
 import { ProfileType, InstitutionProfileData } from '../types/education';
 import { PROFILE_TYPES_CONFIG } from '../data/institutionsData';
 
-export type PlatformAppMode = 'student' | 'partner' | 'telesales' | 'admin_revenue' | 'crm_marketing';
+export type PlatformAppMode = 'explore_cms' | 'crm_marketing' | 'student' | 'partner' | 'telesales' | 'admin_revenue';
 
 interface HeaderProps {
   currentMode: PlatformAppMode;
@@ -96,6 +96,19 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
 
             <button
+              id="mode-switch-explore-cms"
+              onClick={() => onSelectMode('explore_cms')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition ${
+                currentMode === 'explore_cms'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black shadow-md shadow-amber-950'
+                  : 'text-amber-300 hover:text-white hover:bg-slate-900 border border-amber-900/60'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>Explore + Offers CMS Engine</span>
+            </button>
+
+            <button
               id="mode-switch-crm-marketing"
               onClick={() => onSelectMode('crm_marketing')}
               className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition ${
@@ -105,7 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>AI CRM + Marketing Suite (12 Modules)</span>
+              <span>AI CRM Suite</span>
             </button>
 
             <button
@@ -117,8 +130,8 @@ export const Header: React.FC<HeaderProps> = ({
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Student Discovery</span>
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span>Institutes Directory</span>
             </button>
 
             <button
@@ -162,8 +175,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="hidden lg:flex items-center space-x-2 text-[11px] text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>12-Module AI Marketing Suite Online</span>
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+            <span>CMS Discovery Engine Active</span>
           </div>
         </div>
       </div>

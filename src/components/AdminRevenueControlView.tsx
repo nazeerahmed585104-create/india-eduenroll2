@@ -17,7 +17,12 @@ import {
   Filter,
   Check,
   Clock,
-  Briefcase
+  Briefcase,
+  Search,
+  Download,
+  Printer,
+  X,
+  Landmark
 } from 'lucide-react';
 import { PartnerRevenueConfig, PlatformTransaction, ListingPlanTier } from '../types/education';
 import { INITIAL_REVENUE_CONFIGS, calculatePlatformTotals } from '../data/businessConfig';
@@ -42,6 +47,8 @@ export const AdminRevenueControlView: React.FC<AdminRevenueControlViewProps> = (
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterSettlementStatus, setFilterSettlementStatus] = useState<string>('all');
+  const [searchTxQuery, setSearchTxQuery] = useState<string>('');
+  const [selectedTxForAdvice, setSelectedTxForAdvice] = useState<PlatformTransaction | null>(null);
 
   // Simulation calculator state
   const [simPartnerKey, setSimPartnerKey] = useState<string>('college');
@@ -83,6 +90,8 @@ export const AdminRevenueControlView: React.FC<AdminRevenueControlViewProps> = (
   const handleUpdateTransactionStatus = (txId: string, newStatus: PlatformTransaction['settlementStatus']) => {
     const updated = transactions.map(t => t.id === txId ? { ...t, settlementStatus: newStatus } : t);
     onUpdateTransactions(updated);
+    setSaveSuccessMsg(`Transaction ${txId} updated to ${newStatus}`);
+    setTimeout(() => setSaveSuccessMsg(null), 4000);
   };
 
   const handleBatchApproveEscrows = () => {
@@ -93,6 +102,53 @@ export const AdminRevenueControlView: React.FC<AdminRevenueControlViewProps> = (
     );
     onUpdateTransactions(updated);
     setSaveSuccessMsg('Batch escrow clearance processed! All pending transactions marked as Settled.');
+    setTimeout(() => setSaveSuccessMsg(null), 4000);
+  };
+
+  const handleExportTxCSV = () => {
+    const headers = [
+      'Transaction ID',
+      'Date',
+      'Student Name',
+      'Course Name',
+      'Partner Name',
+      'Lead Source',
+      'Course Fee',
+      'Gross Platform Commission',
+      'Partner Payout',
+      'GST 18%',
+      'TDS 5%',
+      'Net Retained',
+      'Status',
+      'Batch ID'
+    ];
+
+    const rows = filteredTransactions.map(t => [
+      t.id,
+      t.transactionDate,
+      `"${t.studentName}"`,
+      `"${t.courseName}"`,
+      `"${t.partnerName}"`,
+      `"${t.leadSource}"`,
+      t.courseFee,
+      t.grossPlatformCommission,
+      t.partnerPayoutAmount,
+      t.gstTax18,
+      t.tdsDeduction5,
+      t.netPlatformRetained,
+      t.settlementStatus,
+      t.settlementBatchId
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `admin_settlements_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setSaveSuccessMsg('Settlement CSV exported successfully!');
     setTimeout(() => setSaveSuccessMsg(null), 4000);
   };
 
@@ -111,9 +167,16 @@ export const AdminRevenueControlView: React.FC<AdminRevenueControlViewProps> = (
     ? revenueConfigs 
     : revenueConfigs.filter(c => c.category === filterCategory);
 
-  const filteredTransactions = filterSettlementStatus === 'all'
-    ? transactions
-    : transactions.filter(t => t.settlementStatus === filterSettlementStatus);
+  const filteredTransactions = transactions.filter(t => {
+    const matchesStatus = filterSettlementStatus === 'all' || t.settlementStatus === filterSettlementStatus;
+    const q = searchTxQuery.toLowerCase().trim();
+    const matchesSearch = !q || 
+      t.id.toLowerCase().includes(q) ||
+      t.studentName.toLowerCase().includes(q) ||
+      t.partnerName.toLowerCase().includes(q) ||
+      t.courseName.toLowerCase().includes(q);
+    return matchesStatus && matchesSearch;
+  });
 
   return (
     <div className="space-y-6">
@@ -517,24 +580,46 @@ export const AdminRevenueControlView: React.FC<AdminRevenueControlViewProps> = (
       {/* ----------------- TAB 2: TRANSACTIONS & SETTLEMENT ENGINE ----------------- */}
       {activeTab === 'transactions_settlement' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
-            <div className="flex items-center space-x-2 text-xs">
-              <span className="text-slate-400">Settlement Status:</span>
-              <select
-                id="settlement-status-filter"
-                value={filterSettlementStatus}
-                onChange={(e) => setFilterSettlementStatus(e.target.value)}
-                className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none"
-              >
-                <option value="all">All Transactions</option>
-                <option value="Settled">Settled (Paid)</option>
-                <option value="Processing Escrow">Processing Escrow</option>
-                <option value="Pending Admin Approval">Pending Admin Approval</option>
-                <option value="Disputed">Disputed / Hold</option>
-              </select>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="text-slate-400">Settlement Status:</span>
+                <select
+                  id="settlement-status-filter"
+                  value={filterSettlementStatus}
+                  onChange={(e) => setFilterSettlementStatus(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none"
+                >
+                  <option value="all">All Transactions</option>
+                  <option value="Settled">Settled (Paid)</option>
+                  <option value="Processing Escrow">Processing Escrow</option>
+                  <option value="Pending Admin Approval">Pending Admin Approval</option>
+                  <option value="Disputed">Disputed / Hold</option>
+                </select>
+              </div>
+
+              {/* Search input */}
+              <div className="relative w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Search student, course, partner..."
+                  value={searchTxQuery}
+                  onChange={(e) => setSearchTxQuery(e.target.value)}
+                  className="w-full pl-8 pr-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
             </div>
 
             <div className="flex items-center space-x-2">
+              <button
+                onClick={handleExportTxCSV}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center space-x-1.5 border border-slate-700 transition"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export CSV</span>
+              </button>
+
               <button
                 id="batch-settle-btn"
                 onClick={handleBatchApproveEscrows}
@@ -564,94 +649,191 @@ export const AdminRevenueControlView: React.FC<AdminRevenueControlViewProps> = (
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {filteredTransactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-800/40 transition">
-                    <td className="px-4 py-3">
-                      <div className="font-mono text-white font-semibold text-[11px]">{tx.id}</div>
-                      <div className="text-[10px] text-slate-500">{tx.transactionDate}</div>
-                    </td>
-
-                    <td className="px-3 py-3">
-                      <div className="font-bold text-white">{tx.studentName}</div>
-                      <div className="text-[11px] text-slate-400">{tx.courseName}</div>
-                    </td>
-
-                    <td className="px-3 py-3">
-                      <div className="text-white font-medium">{tx.partnerName}</div>
-                      <div className="text-[10px] text-slate-500">Type: {tx.partnerType}</div>
-                    </td>
-
-                    <td className="px-3 py-3">
-                      <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 border border-slate-700">
-                        {tx.leadSource}
-                      </span>
-                      {tx.assistedByExecutiveName && (
-                        <div className="text-[10px] text-sky-400 mt-0.5">{tx.assistedByExecutiveName}</div>
-                      )}
-                    </td>
-
-                    <td className="px-3 py-3 font-semibold text-white">
-                      ₹{tx.courseFee.toLocaleString()}
-                    </td>
-
-                    <td className="px-3 py-3 font-bold text-amber-400">
-                      ₹{tx.grossPlatformCommission.toLocaleString()}
-                      <div className="text-[10px] text-amber-500/80 font-normal">({tx.commissionRatePercent}%)</div>
-                    </td>
-
-                    <td className="px-3 py-3 font-bold text-emerald-400">
-                      ₹{tx.partnerPayoutAmount.toLocaleString()}
-                    </td>
-
-                    <td className="px-3 py-3 text-[10px] text-slate-400">
-                      <div>GST: ₹{tx.gstTax18}</div>
-                      <div>TDS: ₹{tx.tdsDeduction5}</div>
-                    </td>
-
-                    <td className="px-3 py-3 font-bold text-indigo-300">
-                      ₹{tx.netPlatformRetained.toLocaleString()}
-                    </td>
-
-                    <td className="px-3 py-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
-                        tx.settlementStatus === 'Settled'
-                          ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                          : tx.settlementStatus === 'Processing Escrow'
-                          ? 'bg-sky-950 text-sky-300 border-sky-800'
-                          : tx.settlementStatus === 'Pending Admin Approval'
-                          ? 'bg-amber-950 text-amber-300 border-amber-800'
-                          : 'bg-rose-950 text-rose-300 border-rose-800'
-                      }`}>
-                        {tx.settlementStatus}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3 text-right">
-                      {tx.settlementStatus !== 'Settled' ? (
-                        <div className="flex items-center justify-end space-x-1">
-                          <button
-                            id={`approve-settle-${tx.id}`}
-                            onClick={() => handleUpdateTransactionStatus(tx.id, 'Settled')}
-                            className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold transition"
-                          >
-                            Release
-                          </button>
-                          <button
-                            onClick={() => handleUpdateTransactionStatus(tx.id, 'Disputed')}
-                            className="px-2 py-1 rounded bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-[11px] transition"
-                          >
-                            Hold
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-emerald-400 font-mono">Disbursed ✓</span>
-                      )}
+                {filteredTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="px-4 py-8 text-center text-slate-500">
+                      No transactions found matching the filter criteria.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredTransactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-slate-800/40 transition">
+                      <td className="px-4 py-3">
+                        <div className="font-mono text-white font-semibold text-[11px]">{tx.id}</div>
+                        <div className="text-[10px] text-slate-500">{tx.transactionDate}</div>
+                      </td>
+
+                      <td className="px-3 py-3">
+                        <div className="font-bold text-white">{tx.studentName}</div>
+                        <div className="text-[11px] text-slate-400">{tx.courseName}</div>
+                      </td>
+
+                      <td className="px-3 py-3">
+                        <div className="text-white font-medium">{tx.partnerName}</div>
+                        <div className="text-[10px] text-slate-500">Type: {tx.partnerType}</div>
+                      </td>
+
+                      <td className="px-3 py-3">
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 border border-slate-700">
+                          {tx.leadSource}
+                        </span>
+                        {tx.assistedByExecutiveName && (
+                          <div className="text-[10px] text-sky-400 mt-0.5">{tx.assistedByExecutiveName}</div>
+                        )}
+                      </td>
+
+                      <td className="px-3 py-3 font-semibold text-white">
+                        ₹{tx.courseFee.toLocaleString()}
+                      </td>
+
+                      <td className="px-3 py-3 font-bold text-amber-400">
+                        ₹{tx.grossPlatformCommission.toLocaleString()}
+                        <div className="text-[10px] text-amber-500/80 font-normal">({tx.commissionRatePercent}%)</div>
+                      </td>
+
+                      <td className="px-3 py-3 font-bold text-emerald-400">
+                        ₹{tx.partnerPayoutAmount.toLocaleString()}
+                      </td>
+
+                      <td className="px-3 py-3 text-[10px] text-slate-400">
+                        <div>GST: ₹{tx.gstTax18}</div>
+                        <div>TDS: ₹{tx.tdsDeduction5}</div>
+                      </td>
+
+                      <td className="px-3 py-3 font-bold text-indigo-300">
+                        ₹{tx.netPlatformRetained.toLocaleString()}
+                      </td>
+
+                      <td className="px-3 py-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                          tx.settlementStatus === 'Settled'
+                            ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                            : tx.settlementStatus === 'Processing Escrow'
+                            ? 'bg-sky-950 text-sky-300 border-sky-800'
+                            : tx.settlementStatus === 'Pending Admin Approval'
+                            ? 'bg-amber-950 text-amber-300 border-amber-800'
+                            : 'bg-rose-950 text-rose-300 border-rose-800'
+                        }`}>
+                          {tx.settlementStatus}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end space-x-1.5">
+                          <button
+                            onClick={() => setSelectedTxForAdvice(tx)}
+                            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+                            title="View Settlement Advice Slip"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+
+                          {tx.settlementStatus !== 'Settled' ? (
+                            <>
+                              <button
+                                id={`approve-settle-${tx.id}`}
+                                onClick={() => handleUpdateTransactionStatus(tx.id, 'Settled')}
+                                className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold transition"
+                              >
+                                Release
+                              </button>
+                              <button
+                                onClick={() => handleUpdateTransactionStatus(tx.id, 'Disputed')}
+                                className="px-2 py-1 rounded bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-[11px] transition"
+                              >
+                                Hold
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[10px] text-emerald-400 font-mono">Disbursed ✓</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
+
+          {/* Modal Advice Slip for Admin */}
+          {selectedTxForAdvice && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl p-6 space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 rounded-lg bg-amber-500 text-slate-950">
+                      <Landmark className="w-4 h-4 font-bold" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Settlement Disbursement Voucher</h3>
+                      <p className="text-[10px] text-slate-400 font-mono">Tx ID: {selectedTxForAdvice.id}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedTxForAdvice(null)}
+                    className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3 text-xs">
+                  <div className="flex justify-between border-b border-slate-800 pb-2">
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase font-semibold">Beneficiary Partner</span>
+                      <div className="font-bold text-white">{selectedTxForAdvice.partnerName}</div>
+                      <div className="text-[10px] text-slate-400">Type: {selectedTxForAdvice.partnerType}</div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-500 uppercase font-semibold">Student Admission</span>
+                      <div className="font-bold text-white">{selectedTxForAdvice.studentName}</div>
+                      <div className="text-[10px] text-slate-400">{selectedTxForAdvice.courseName}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex justify-between text-slate-300">
+                      <span>Total Course Fee Collected:</span>
+                      <span className="font-mono font-bold text-white">₹{selectedTxForAdvice.courseFee.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-400">
+                      <span>Platform Commission ({selectedTxForAdvice.commissionRatePercent}%):</span>
+                      <span className="font-mono font-bold">-₹{selectedTxForAdvice.grossPlatformCommission.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-400">
+                      <span>GST (18% on service):</span>
+                      <span className="font-mono text-slate-300">₹{selectedTxForAdvice.gstTax18}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-400">
+                      <span>TDS Withheld Sec 194H (5%):</span>
+                      <span className="font-mono text-slate-300">₹{selectedTxForAdvice.tdsDeduction5}</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-slate-800 text-sm font-black text-emerald-400">
+                      <span>Net Disbursable Amount:</span>
+                      <span className="font-mono">₹{selectedTxForAdvice.partnerPayoutAmount.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end space-x-2 pt-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center space-x-1.5"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Print Slip</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedTxForAdvice(null)}
+                    className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -550,3 +550,66 @@ export interface MetaLeadFormSubmission {
   admissionStatus: 'New Lead' | 'In Counselling' | 'Application Submitted' | 'Fee Paid (Enrolled)';
 }
 
+// ==========================================
+// 15. CRM Financial Settlement & Payout Types
+// ==========================================
+export type SettlementCycleType = 'INSTANT_IMPS' | 'T_PLUS_1' | 'T_PLUS_3' | 'BI_WEEKLY' | 'MONTHLY_NET15' | 'QUARTERLY_MOU';
+
+export type SettlementStatusType = 'SETTLED' | 'PROCESSING_ESCROW' | 'PENDING_APPROVAL' | 'ON_HOLD_DISPUTE' | 'REFUNDED_REVERSED';
+
+export interface CRMSettlementTransaction {
+  id: string;
+  transactionDate: string;
+  settlementDueDate: string;
+  studentName: string;
+  studentEmail: string;
+  studentPhone: string;
+  razorpayPaymentId: string;
+  razorpayOrderId: string;
+  partnerId: string;
+  partnerName: string;
+  partnerCategory: 'higher_education' | 'competitive_coaching' | 'school_tutor' | 'admission_partner' | 'it_professional';
+  partnerTypeLabel: string;
+  courseName: string;
+  courseFee: number;
+  leadSource: 'Direct Student / Organic' | 'Tele-sales Assisted' | 'Admission Partner Referral' | 'Platform Spotlight Ad';
+  counselorName?: string;
+  counselorIncentive: number;
+  admissionPartnerShare: number;
+  commissionRatePercent: number;
+  grossPlatformCommission: number;
+  gstTax18: number;
+  tdsDeduction5: number;
+  partnerPayoutAmount: number;
+  netPlatformRetained: number;
+  settlementStatus: SettlementStatusType;
+  settlementCycle: SettlementCycleType;
+  bankAccount: {
+    accountHolder: string;
+    bankName: string;
+    accountNumberMasked: string;
+    ifscCode: string;
+    razorpayRouteAccountId?: string;
+    kycStatus: 'VERIFIED' | 'PENDING';
+  };
+  utrNumber?: string;
+  clearedAt?: string;
+  batchId: string;
+  invoiceNumber: string;
+  disputeNotes?: string;
+}
+
+export interface SettlementBatchRun {
+  batchId: string;
+  batchDate: string;
+  cycleType: SettlementCycleType;
+  totalTransactions: number;
+  grossDisbursement: number;
+  totalTdsDeducted: number;
+  totalGstProcessed: number;
+  netBankTransfer: number;
+  status: 'COMPLETED' | 'PROCESSING' | 'SCHEDULED';
+  processedBy: string;
+  bankAckReference: string;
+}
+
