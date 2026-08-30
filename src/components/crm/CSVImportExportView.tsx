@@ -30,6 +30,7 @@ export const CSVImportExportView: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // Export State
   const [exportFormat, setExportFormat] = useState<'CSV' | 'XLSX'>('CSV');
@@ -136,6 +137,25 @@ export const CSVImportExportView: React.FC = () => {
         </div>
       </div>
 
+      {importError && (
+        <div 
+          id="csv-file-size-error-toast"
+          role="alert"
+          className="p-4 rounded-xl bg-rose-950/80 border border-rose-600 text-rose-100 text-xs flex items-center justify-between gap-3 shadow-lg shadow-rose-950/60 animate-fadeIn"
+        >
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <span className="p-1.5 rounded-lg bg-rose-500/20 text-rose-400 font-bold shrink-0">⚠️</span>
+            <span className="font-semibold leading-relaxed">{importError}</span>
+          </div>
+          <button
+            onClick={() => setImportError(null)}
+            className="text-rose-400 hover:text-white px-2 py-1 rounded hover:bg-rose-900/60 text-xs font-semibold cursor-pointer shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {importSuccess && (
         <div className="p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-700/60 text-emerald-200 text-xs flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -171,7 +191,20 @@ export const CSVImportExportView: React.FC = () => {
               <input
                 type="file"
                 accept=".csv,.xlsx"
-                onChange={e => e.target.files && setSelectedFile(e.target.files[0])}
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 10 * 1024 * 1024) {
+                    const actualSize = (file.size / (1024 * 1024)).toFixed(1);
+                    setImportError(`File "${file.name}" (${actualSize} MB) exceeds the 10MB limit. Please upload a spreadsheet smaller than 10.0 MB.`);
+                    setTimeout(() => setImportError(null), 6000);
+                    e.target.value = '';
+                    setSelectedFile(null);
+                    return;
+                  }
+                  setImportError(null);
+                  setSelectedFile(file);
+                }}
                 className="hidden"
                 id="file-upload-input"
               />
@@ -181,7 +214,7 @@ export const CSVImportExportView: React.FC = () => {
               >
                 {selectedFile ? selectedFile.name : 'Select File from Device'}
               </label>
-              <div className="text-[11px] text-slate-500">Max file size: 25MB • Up to 50,000 rows per batch</div>
+              <div className="text-[11px] text-slate-500">Max file size: 10MB • Up to 50,000 rows per batch</div>
             </div>
 
             <div className="space-y-2 text-xs text-slate-300">

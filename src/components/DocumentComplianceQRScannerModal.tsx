@@ -98,6 +98,7 @@ export const DocumentComplianceQRScannerModal: React.FC<DocumentComplianceQRScan
   );
   const [isSubmittingLog, setIsSubmittingLog] = useState<boolean>(false);
   const [verificationSuccessMessage, setVerificationSuccessMessage] = useState<string | null>(null);
+  const [uploadErrorToast, setUploadErrorToast] = useState<string | null>(null);
 
   // Selected comparison document in dropdown if user wants to compare with another doc
   const [selectedDocIdForComparison, setSelectedDocIdForComparison] = useState<string>(
@@ -283,6 +284,15 @@ export const DocumentComplianceQRScannerModal: React.FC<DocumentComplianceQRScan
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 10 * 1024 * 1024) {
+      const actualSize = (file.size / (1024 * 1024)).toFixed(1);
+      setUploadErrorToast(`Image "${file.name}" (${actualSize} MB) exceeds the 10MB limit. Maximum allowed size is 10.0 MB.`);
+      setTimeout(() => setUploadErrorToast(null), 6000);
+      e.target.value = '';
+      return;
+    }
+
+    setUploadErrorToast(null);
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
@@ -303,7 +313,8 @@ export const DocumentComplianceQRScannerModal: React.FC<DocumentComplianceQRScan
         if (code && code.data) {
           processDecodedString(code.data);
         } else {
-          alert('No recognizable compliance QR seal detected in the uploaded image. Please try another image or preset.');
+          setUploadErrorToast('No recognizable compliance QR seal detected in the uploaded image. Please try another clear scan or select a preset.');
+          setTimeout(() => setUploadErrorToast(null), 6000);
         }
       };
       img.src = event.target?.result as string;
@@ -593,25 +604,48 @@ export const DocumentComplianceQRScannerModal: React.FC<DocumentComplianceQRScan
               )}
 
               {activeTab === 'upload' && (
-                <div className="relative w-full aspect-video rounded-2xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-indigo-500/60 p-6 flex flex-col items-center justify-center text-center transition-all group">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                  />
-                  <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 group-hover:scale-110 transition-transform mb-2">
-                    <Upload className="w-7 h-7" />
+                <div className="space-y-3">
+                  {uploadErrorToast && (
+                    <div 
+                      id="scanner-image-error-toast"
+                      role="alert"
+                      className="p-3.5 rounded-xl bg-rose-950/90 border border-rose-600 text-rose-100 text-xs flex items-center justify-between gap-3 animate-fadeIn"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span className="font-semibold">{uploadErrorToast}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setUploadErrorToast(null)}
+                        className="text-rose-400 hover:text-white px-2 py-0.5 rounded text-xs underline cursor-pointer"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="relative w-full aspect-video rounded-2xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-indigo-500/60 p-6 flex flex-col items-center justify-center text-center transition-all group">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    />
+                    <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 group-hover:scale-110 transition-transform mb-2">
+                      <Upload className="w-7 h-7" />
+                    </div>
+                    <div className="font-bold text-white text-sm mb-1">
+                      Upload Regulatory Seal Image
+                    </div>
+                    <p className="text-[11px] text-slate-400 max-w-sm mb-2">
+                      Drag and drop a photo or scan of a certificate's tamper-evident QR code (PNG, JPG, WEBP)
+                    </p>
+                    <div className="text-[10px] text-indigo-400 mb-3 font-mono">Max allowable size: 10MB</div>
+                    <span className="px-3 py-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 text-[11px] font-semibold">
+                      Browse Files
+                    </span>
                   </div>
-                  <div className="font-bold text-white text-sm mb-1">
-                    Upload Regulatory Seal Image
-                  </div>
-                  <p className="text-[11px] text-slate-400 max-w-sm mb-3">
-                    Drag and drop a photo or scan of a certificate's tamper-evident QR code (PNG, JPG, WEBP)
-                  </p>
-                  <span className="px-3 py-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 text-[11px] font-semibold">
-                    Browse Files
-                  </span>
                 </div>
               )}
 

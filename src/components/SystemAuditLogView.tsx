@@ -1,8 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { 
   SystemAuditLogEntry, 
-  SystemAuditEventType 
+  SystemAuditEventType,
+  ComplianceCertificate,
+  RegulatoryAuditSummary
 } from '../types/regulatoryAudit';
+import { InstitutionProfileData } from '../types/education';
+import { generateSignedAuditLogPdf } from '../utils/generateSignedAuditLogPdf';
 import {
   History,
   Trash2,
@@ -26,16 +30,23 @@ import {
   FileSpreadsheet,
   X,
   QrCode,
-  FileText
+  FileText,
+  FileCheck2
 } from 'lucide-react';
 
 interface SystemAuditLogViewProps {
   logs: SystemAuditLogEntry[];
+  certificates?: ComplianceCertificate[];
+  auditSummary?: RegulatoryAuditSummary;
+  institution?: InstitutionProfileData;
   onRefresh?: () => void;
 }
 
 export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
   logs,
+  certificates = [],
+  auditSummary,
+  institution,
   onRefresh
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,6 +56,7 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
   const [inspectingLog, setInspectingLog] = useState<SystemAuditLogEntry | null>(null);
   const [copiedHashId, setCopiedHashId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Toggle row expansion
   const toggleExpand = (id: string) => {
@@ -159,6 +171,31 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
     }
   };
 
+  // Export Signed Audit Log PDF
+  const handleDownloadSignedPdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      let filterScope = 'Complete System Audit Ledger';
+      if (selectedEventType !== 'ALL' || selectedSeverity !== 'ALL' || searchQuery.trim()) {
+        filterScope = `Filtered Stream (${filteredLogs.length} matching events)`;
+      }
+
+      await generateSignedAuditLogPdf({
+        systemAuditLogs: filteredLogs,
+        certificates,
+        auditSummary,
+        institution,
+        filterDescription: filterScope,
+        signatoryName: institution?.deanName || 'Dr. Rajesh K. Sharma',
+        signatoryRole: 'Chief Regulatory Officer & Statutory Compliance Directorate'
+      });
+    } catch (err) {
+      console.error('Failed to export Signed Audit PDF:', err);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   // Helper for rendering event badge
   const renderEventTypeBadge = (type: SystemAuditEventType) => {
     switch (type) {
@@ -250,12 +287,12 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
           </div>
 
           {/* Action Toolbar (Export & Refresh) */}
-          <div className="flex items-center space-x-2 self-start md:self-center">
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
             {onRefresh && (
               <button
                 id="btn-refresh-audit-log"
                 onClick={onRefresh}
-                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-semibold border border-slate-800 flex items-center space-x-1.5 transition"
+                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-semibold border border-slate-800 flex items-center space-x-1.5 transition cursor-pointer"
                 title="Refresh audit ledger"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -267,11 +304,34 @@ export const SystemAuditLogView: React.FC<SystemAuditLogViewProps> = ({
               id="btn-export-audit-csv"
               onClick={handleExportCSV}
               disabled={isExporting || filteredLogs.length === 0}
-              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-lg shadow-indigo-950 transition disabled:opacity-50"
+              className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-semibold border border-slate-800 flex items-center space-x-1.5 transition disabled:opacity-50 cursor-pointer"
               title="Export complete system audit trail to CSV file"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Export Audit Trail (.CSV)</span>
+              <span>Export CSV</span>
+            </button>
+
+            <button
+              id="btn-download-signed-pdf-log"
+              onClick={handleDownloadSignedPdf}
+              disabled={isGeneratingPdf || filteredLogs.length === 0}
+              className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-lg shadow-emerald-950/60 border border-emerald-400/30 transition disabled:opacity-50 cursor-pointer"
+              title="Download entire system audit trail as a cryptographically signed PDF document"
+            >
+              {isGeneratingPdf ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <FileCheck2 className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>Download Signed PDF</span>
+                  <span className="hidden sm:inline-block px-1.5 py-0.2 rounded bg-emerald-900/80 text-emerald-200 text-[9px] font-mono border border-emerald-700">
+                    SHA-256
+                  </span>
+                </>
+              )}
             </button>
           </div>
         </div>

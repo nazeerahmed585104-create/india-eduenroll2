@@ -76,6 +76,8 @@ const POPULAR_TAGS = [
   'State-NOC'
 ];
 
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB limit
+
 export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   isOpen,
   onClose,
@@ -89,6 +91,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string | null>(null);
   const [fileExtension, setFileExtension] = useState<string>('PDF');
   const [fileSizeText, setFileSizeText] = useState<string>('2.4 MB');
+
+  // Error Toast state for file upload limits
+  const [errorToast, setErrorToast] = useState<{
+    title: string;
+    message: string;
+    actualSize?: string;
+  } | null>(null);
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Form Fields
   const [name, setName] = useState<string>('');
@@ -106,9 +116,29 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const triggerToast = (title: string, message: string, actualSize?: string) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setErrorToast({ title, message, actualSize });
+    toastTimerRef.current = setTimeout(() => {
+      setErrorToast(null);
+    }, 6000);
+  };
+
+  const dismissToast = () => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setErrorToast(null);
+  };
+
   // Initialize or reset form state when modal opens
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      dismissToast();
+      return;
+    }
 
     if (mode === 'update' && documentToEdit) {
       setName(documentToEdit.name || '');
@@ -157,6 +187,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     }
     setErrors({});
     setTagInput('');
+    setErrorToast(null);
+
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
   }, [isOpen, mode, documentToEdit, institution]);
 
   if (!isOpen) return null;
@@ -178,8 +215,35 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
-  // Handle file selection from drag-and-drop or manual click
-  const handleProcessFile = (file: File) => {
+  // Handle file selection from drag-and-drop or manual click with 10MB validation check
+  const handleProcessFile = (file: File): boolean => {
+    // Client-side 10MB size validation check
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      const formattedSize = formatBytes(file.size);
+      
+      // Show high-priority error toast notification
+      triggerToast(
+        'Upload Limit Exceeded (10MB Max)',
+        `Document "${file.name}" is ${formattedSize}, which exceeds the maximum allowable limit of 10.0 MB. Please compress the file or choose a document under 10MB.`,
+        formattedSize
+      );
+
+      // Record inline field error
+      setErrors(prev => ({
+        ...prev,
+        file: `Selected file "${file.name}" (${formattedSize}) exceeds the 10MB limit. Upload prevented.`
+      }));
+
+      // Reset file input element so subsequent selection fires change events
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return false;
+    }
+
+    // Dismiss any previous error toast if a valid file is provided
+    dismissToast();
+
     setSelectedFile(file);
     const ext = getExtensionFromName(file.name);
     setFileExtension(ext);
@@ -213,6 +277,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         return next;
       });
     }
+
+    return true;
   };
 
   // Drag-and-drop handlers
@@ -279,6 +345,11 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     const newErrors: Record<string, string> = {};
     if (!name.trim()) {
       newErrors.name = 'Document name is required';
+    }
+
+    if (errors.file) {
+      triggerToast('Cannot Save Document', errors.file);
+      return;
     }
 
     if (mode === 'add' && !selectedFile && !name.includes('.')) {
@@ -357,6 +428,52 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           </button>
         </div>
 
+        {/* Error Toast Notification Banner */}
+        {errorToast && (
+          <div 
+            id="file-size-error-toast"
+            role="alert"
+            className="mx-6 mt-4 p-4 rounded-xl bg-gradient-to-r from-rose-950 via-red-950 to-slate-950 border-2 border-rose-500/80 shadow-2xl shadow-rose-950/80 text-rose-100 flex items-start justify-between gap-3 animate-fadeIn shrink-0 z-20"
+          >
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="p-2 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-400 shrink-0 mt-0.5 animate-pulse">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
+                    <span>{errorToast.title}</span>
+                  </h4>
+                  {errorToast.actualSize && (
+                    <span className="px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-200 border border-rose-400/40 text-[10px] font-mono font-bold">
+                      Detected: {errorToast.actualSize}
+                    </span>
+                  )}
+                  <span className="px-2 py-0.5 rounded-full bg-slate-900 text-rose-300 border border-rose-800 text-[10px] font-mono">
+                    Limit: 10.0 MB
+                  </span>
+                </div>
+                <p className="text-xs text-rose-200/90 leading-relaxed font-medium">
+                  {errorToast.message}
+                </p>
+                <div className="flex items-center gap-2 pt-1 text-[11px] text-rose-300/80">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Only files up to 10MB are permitted to ensure fast loading and regulatory archival integrity.</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={dismissToast}
+              className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-900/60 rounded-lg transition-colors shrink-0 cursor-pointer"
+              title="Dismiss error"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Scrollable Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-1">
           
@@ -367,7 +484,12 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 <FileCheck className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Document File Upload &amp; Drag-and-Drop Zone</span>
               </label>
-              <span className="text-[11px] text-slate-400">PDF, PNG, JPG, DOCX, XLSX (Max 25MB)</span>
+              <div className="flex items-center gap-1.5">
+                <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold">
+                  Max 10MB Limit
+                </span>
+                <span className="text-[11px] text-slate-400">PDF, PNG, JPG, DOCX, XLSX</span>
+              </div>
             </div>
 
             {/* Hidden native input */}
@@ -387,11 +509,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               onDrop={handleDrop}
               onClick={handleTriggerFileInput}
               className={`relative border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all duration-200 ${
-                isDragging 
-                  ? 'border-indigo-500 bg-indigo-950/40 scale-[1.01] shadow-lg shadow-indigo-950/60' 
-                  : selectedFile || thumbnailPreviewUrl
-                    ? 'border-emerald-500/50 bg-slate-950/70 hover:border-emerald-500 hover:bg-slate-950' 
-                    : 'border-slate-700 hover:border-indigo-500/70 bg-slate-950/50 hover:bg-slate-950'
+                errors.file
+                  ? 'border-rose-500 bg-rose-950/30 hover:bg-rose-950/40 shadow-lg shadow-rose-950/50'
+                  : isDragging 
+                    ? 'border-indigo-500 bg-indigo-950/40 scale-[1.01] shadow-lg shadow-indigo-950/60' 
+                    : selectedFile || thumbnailPreviewUrl
+                      ? 'border-emerald-500/50 bg-slate-950/70 hover:border-emerald-500 hover:bg-slate-950' 
+                      : 'border-slate-700 hover:border-indigo-500/70 bg-slate-950/50 hover:bg-slate-950'
               }`}
             >
               {/* If a file has been dropped / selected or has thumbnail */}
@@ -487,6 +611,32 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Inline validation error if file exceeds 10MB */}
+            {errors.file && (
+              <div 
+                id="document-upload-file-error"
+                className="p-3 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-xs flex items-center justify-between gap-2 animate-fadeIn"
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span className="font-medium">{errors.file}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrors(prev => {
+                      const next = { ...prev };
+                      delete next.file;
+                      return next;
+                    });
+                  }}
+                  className="text-rose-400 hover:text-white text-[11px] underline shrink-0 cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
           </div>
 
           {/* DOCUMENT METADATA GRID */}

@@ -90,6 +90,7 @@ import {
   formatDisplayDate, 
   getRenewalWindowAnalysis 
 } from '../utils/complianceDateUtils';
+import { generateSignedAuditLogPdf } from '../utils/generateSignedAuditLogPdf';
 import { InstitutionProfileData } from '../types/education';
 
 interface RegulatoryAuditViewProps {
@@ -108,6 +109,7 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({
   const [activeAuditTab, setActiveAuditTab] = useState<'certificates' | 'system_audit' | 'calendar'>(initialActiveTab);
   const [localSystemAuditLogs, setLocalSystemAuditLogs] = useState<SystemAuditLogEntry[]>(INITIAL_SYSTEM_AUDIT_LOGS);
   const currentSystemAuditLogs = externalLogs || localSystemAuditLogs;
+  const [isGeneratingSignedPdf, setIsGeneratingSignedPdf] = useState<boolean>(false);
 
   const recordSystemAuditEvent = (entry: SystemAuditLogEntry) => {
     if (onLogSystemAuditEvent) {
@@ -672,6 +674,29 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({
     }, 800);
   };
 
+  // Download Complete System Audit Log as Signed PDF
+  const handleDownloadSignedAuditLogPdf = async (filterScope: string = 'Complete System Audit Ledger') => {
+    setIsGeneratingSignedPdf(true);
+    try {
+      showToast('Generating cryptographically signed system audit log PDF with SHA-256 seal...', 'info');
+      await generateSignedAuditLogPdf({
+        systemAuditLogs: currentSystemAuditLogs,
+        certificates,
+        auditSummary,
+        institution,
+        filterDescription: filterScope,
+        signatoryName: institution?.deanName || 'Dr. Rajesh K. Sharma',
+        signatoryRole: 'Chief Regulatory Officer & Statutory Compliance Directorate'
+      });
+      showToast('Signed System Audit Log PDF successfully generated and downloaded.', 'success');
+    } catch (error) {
+      console.error('Error generating signed PDF:', error);
+      showToast('Failed to generate signed PDF. Please try again.', 'warning');
+    } finally {
+      setIsGeneratingSignedPdf(false);
+    }
+  };
+
   // Export Compliance Report CSV
   const handleExportAuditCSV = () => {
     const headers = "Certificate_Name,Category,Issuing_Authority,Certificate_Number,Issue_Date,Expiry_Date,Days_Remaining,Status,Urgency,Mandatory_For_Admissions,Assigned_Officer,Audit_Actions_Count\n";
@@ -811,10 +836,33 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({
             <button
               id="btn-export-audit-csv"
               onClick={handleExportAuditCSV}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center space-x-2 shadow-lg shadow-indigo-950 transition-all cursor-pointer"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 border border-slate-700 shadow-sm transition-all cursor-pointer"
+              title="Download raw audit and certificate data in CSV format"
             >
-              <Download className="w-4 h-4" />
-              <span>Download Audit Report</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
+            <button
+              id="btn-download-signed-audit-pdf"
+              onClick={() => handleDownloadSignedAuditLogPdf('Complete Regulatory System Audit Ledger')}
+              disabled={isGeneratingSignedPdf}
+              className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold flex items-center space-x-2 shadow-lg shadow-emerald-950/60 border border-emerald-400/30 transition-all cursor-pointer disabled:opacity-50"
+              title="Download entire system audit log and certificate inventory as a cryptographically signed PDF with SHA-256 seal"
+            >
+              {isGeneratingSignedPdf ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <FileCheck2 className="w-4 h-4 text-emerald-200" />
+                  <span>Download Signed PDF</span>
+                  <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-emerald-900/80 text-emerald-200 text-[9px] font-mono border border-emerald-700/80">
+                    SHA-256
+                  </span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -909,6 +957,9 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({
       ) : activeAuditTab === 'system_audit' ? (
         <SystemAuditLogView
           logs={currentSystemAuditLogs}
+          certificates={certificates}
+          auditSummary={auditSummary}
+          institution={institution}
           onRefresh={() => showToast('System audit log telemetry verified against SHA-256 blockchain ledger.', 'info')}
         />
       ) : (
@@ -2131,10 +2182,21 @@ export const RegulatoryAuditView: React.FC<RegulatoryAuditViewProps> = ({
                 <input
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={e => e.target.files && setRenewalFile(e.target.files[0])}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 10 * 1024 * 1024) {
+                      const actualSize = (file.size / (1024 * 1024)).toFixed(1);
+                      showToast(`Upload Rejected: Document "${file.name}" (${actualSize} MB) exceeds the 10MB limit. Maximum allowed size is 10.0 MB.`, 'warning');
+                      e.target.value = '';
+                      setRenewalFile(null);
+                      return;
+                    }
+                    setRenewalFile(file);
+                  }}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer"
                 />
-                <p className="text-[10px] text-slate-500 mt-1">Maximum size: 15MB. Official authority signature required.</p>
+                <p className="text-[10px] text-slate-500 mt-1">Maximum size: 10MB. Official authority signature required.</p>
               </div>
 
               <div>
